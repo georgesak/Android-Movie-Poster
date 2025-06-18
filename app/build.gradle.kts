@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.movieposter"
+    namespace = "com.georgesak.movieposter"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.movieposter"
+        applicationId = "com.georgesak.movieposter"
         minSdk = 24
         targetSdk = 35
         versionCode = 1

@@ -1,4 +1,4 @@
-package com.example.movieposter.ui.theme
+package com.georgesak.movieposter.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

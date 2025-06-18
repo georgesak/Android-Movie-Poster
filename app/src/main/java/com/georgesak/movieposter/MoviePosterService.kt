@@ -1,4 +1,4 @@
-package com.example.movieposter
+package com.georgesak.movieposter
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -47,7 +47,7 @@ class MoviePosterService : Service() {
     private fun createPersistentNotification() = NotificationCompat.Builder(this, CHANNEL_ID)
         .setContentTitle("Movie Poster Slideshow Running")
         .setContentText("Tap to open settings")
-        .setSmallIcon(R.drawable.ic_launcher_background) // Use an appropriate icon
+        .setSmallIcon(R.mipmap.ic_launcher) // Use the app icon
         .setContentIntent(createSettingsPendingIntent())
         .setOngoing(true) // Makes the notification persistent
         .build()

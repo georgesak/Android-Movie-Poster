@@ -1,4 +1,4 @@
-package com.example.movieposter.data
+package com.georgesak.movieposter.data
 
 import com.google.gson.annotations.SerializedName
 

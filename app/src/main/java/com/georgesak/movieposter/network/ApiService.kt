@@ -1,8 +1,8 @@
-package com.example.movieposter.network
+package com.georgesak.movieposter.network
 
-import com.example.movieposter.data.MovieResponse
-import com.example.movieposter.data.VideoResponse
-import com.example.movieposter.data.GenreResponse
+import com.georgesak.movieposter.data.MovieResponse
+import com.georgesak.movieposter.data.VideoResponse
+import com.georgesak.movieposter.data.GenreResponse
 import retrofit2.Response
 import retrofit2.http.GET
 import retrofit2.http.Path

@@ -1,4 +1,4 @@
-package com.example.movieposter.ui
+package com.georgesak.movieposter.ui
 
 import android.app.Application
 import android.content.Context
@@ -7,9 +7,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.example.movieposter.data.Genre
-import com.example.movieposter.data.Movie
-import com.example.movieposter.network.ApiService
+import com.georgesak.movieposter.data.Genre
+import com.georgesak.movieposter.data.Movie
+import com.georgesak.movieposter.network.ApiService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch

@@ -1,4 +1,4 @@
-package com.example.movieposter
+package com.georgesak.movieposter
 
 import android.content.Context
 import android.content.SharedPreferences
@@ -29,9 +29,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.movieposter.data.Genre
-import com.example.movieposter.ui.MovieViewModel
-import com.example.movieposter.ui.theme.MoviePosterTheme
+import com.georgesak.movieposter.data.Genre
+import com.georgesak.movieposter.ui.MovieViewModel
+import com.georgesak.movieposter.ui.theme.MoviePosterTheme
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.selection.toggleable
@@ -72,21 +72,69 @@ fun SettingsScreen(movieViewModel: MovieViewModel = viewModel()) {
         mutableStateOf(savedGenreIds)
     }
 
+fun saveSettings(
+        sharedPreferences: SharedPreferences,
+        transitionDelay: Long,
+        apiKey: String,
+        selectedGenreIds: Set<Int>,
+        movieViewModel: MovieViewModel,
+        context: Context
+    ) {
+        sharedPreferences.edit().apply {
+            putLong("transition_delay", transitionDelay)
+            putString("api_key", apiKey)
+            putStringSet("selected_genre_ids", selectedGenreIds.map { it.toString() }.toSet())
+            apply()
+        }
+        movieViewModel.getPopularMovies(selectedGenreIds)
+        val intent = android.content.Intent(context, MainActivity::class.java)
+        context.startActivity(intent)
+    }
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Settings") })
+            TopAppBar(
+                title = { Text("Settings") },
+                actions = {
+                    Button(
+                        onClick = {
+                            // Navigate back to MainActivity without saving
+                            val intent = android.content.Intent(context, MainActivity::class.java)
+                            context.startActivity(intent)
+                        },
+                        modifier = Modifier.padding(end = 8.dp)
+                    ) {
+                        Text("Cancel")
+                    }
+                    Button(
+                        onClick = {
+                            saveSettings(
+                                sharedPreferences,
+                                transitionDelay,
+                                apiKey,
+                                selectedGenreIds,
+                                movieViewModel,
+                                context
+                            )
+                        },
+                        modifier = Modifier.padding(end = 8.dp)
+                    ) {
+                        Text("Save")
+                    }
+                }
+            )
         }
     ) { paddingValues ->
         val scrollState = rememberScrollState()
         Column(
             modifier = Modifier
                 .padding(paddingValues)
-                .padding(16.dp)
+                .padding(horizontal = 16.dp)
                 .fillMaxSize()
                 .verticalScroll(scrollState),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            Spacer(modifier = Modifier.padding(top = 16.dp))
             Text("Transition Delay (10 to 600 seconds)")
             OutlinedTextField(
                 value = (transitionDelay / 1000L).toString(),
@@ -100,7 +148,6 @@ fun SettingsScreen(movieViewModel: MovieViewModel = viewModel()) {
                     }
                     val milliseconds = validSeconds * 1000L
                     setTransitionDelay(milliseconds)
-                    sharedPreferences.edit().putLong("transition_delay", milliseconds).apply()
                 },
                 label = { Text("Delay") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
@@ -111,7 +158,6 @@ fun SettingsScreen(movieViewModel: MovieViewModel = viewModel()) {
                 value = apiKey,
                 onValueChange = { newValue ->
                     setApiKey(newValue)
-                    sharedPreferences.edit().putString("api_key", newValue).apply()
                 },
                 label = { Text("API Key") }
             )
@@ -129,7 +175,6 @@ fun SettingsScreen(movieViewModel: MovieViewModel = viewModel()) {
                             value = selectedGenreIds.isEmpty() || selectedGenreIds.contains(0),
                             onValueChange = {
                                 setSelectedGenreIds(setOf(0))
-                                sharedPreferences.edit().putStringSet("selected_genre_ids", setOf("0")).apply()
                             },
                             role = Role.Checkbox
                         )
@@ -155,7 +200,6 @@ fun SettingsScreen(movieViewModel: MovieViewModel = viewModel()) {
                                         selectedGenreIds + genre.id
                                     }
                                     setSelectedGenreIds(newSelection.filter { it != 0 }.toSet())
-                                    sharedPreferences.edit().putStringSet("selected_genre_ids", newSelection.map { it.toString() }.toSet()).apply()
                                 },
                                 role = Role.Checkbox
                             )
@@ -171,20 +215,7 @@ fun SettingsScreen(movieViewModel: MovieViewModel = viewModel()) {
                 }
             }
 
-            Button(
-                onClick = {
-                    val savedGenreIds = sharedPreferences.getStringSet("selected_genre_ids", emptySet())
-                        ?.mapNotNull { it.toIntOrNull() }?.toSet() ?: emptySet()
-                    movieViewModel.getPopularMovies(savedGenreIds)
-                    val intent = android.content.Intent(context, MainActivity::class.java)
-                    context.startActivity(intent)
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 16.dp)
-            ) {
-                Text("Save and Return to Slideshow")
-            }
+            Spacer(modifier = Modifier.weight(1f)) // Push content to top if needed
         }
     }
 }

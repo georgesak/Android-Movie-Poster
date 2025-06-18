@@ -1,4 +1,4 @@
-package com.example.movieposter
+package com.georgesak.movieposter
 
 import android.Manifest
 import android.content.Context
@@ -59,8 +59,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
-import com.example.movieposter.ui.MovieViewModel
-import com.example.movieposter.ui.theme.MoviePosterTheme
+import com.georgesak.movieposter.ui.MovieViewModel
+import com.georgesak.movieposter.ui.theme.MoviePosterTheme
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.YouTubePlayer
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.listeners.AbstractYouTubePlayerListener
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.options.IFramePlayerOptions

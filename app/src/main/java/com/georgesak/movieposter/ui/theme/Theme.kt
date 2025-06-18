@@ -1,4 +1,4 @@
-package com.example.movieposter.ui.theme
+package com.georgesak.movieposter.ui.theme
 
 import android.app.Activity
 import android.os.Build
