@@ -1,10 +1,10 @@
 package com.example.movieposter.network
 
 import com.example.movieposter.data.MovieResponse
-import com.example.movieposter.data.VideoResponse // Import VideoResponse
+import com.example.movieposter.data.VideoResponse
 import retrofit2.Response
 import retrofit2.http.GET
-import retrofit2.http.Path // Import Path
+import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface ApiService {

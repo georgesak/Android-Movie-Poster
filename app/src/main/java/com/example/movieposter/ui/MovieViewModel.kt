@@ -1,12 +1,11 @@
 package com.example.movieposter.ui
 
-import androidx.lifecycle.ViewModelProvider
-
 import android.app.Application
 import android.content.Context
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
-import androidx.lifecycle.AndroidViewModel // Change to AndroidViewModel
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.movieposter.data.Movie
 import com.example.movieposter.network.ApiService

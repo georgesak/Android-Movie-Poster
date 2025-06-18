@@ -1,72 +1,71 @@
 package com.example.movieposter
 
-import androidx.compose.material3.Icon
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PlayArrow
-import android.content.Intent // Import Intent
+import android.Manifest
+import android.content.Context
+import android.content.Intent
+import android.content.SharedPreferences
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
-import android.os.Build // Import Build
 import androidx.activity.ComponentActivity
-import android.Manifest // Import Manifest
-import androidx.activity.result.contract.ActivityResultContracts // Import ActivityResultContracts
-import androidx.core.content.ContextCompat // Import ContextCompat
-import android.content.pm.PackageManager // Import PackageManager
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.animation.Crossfade // Import Crossfade
-import androidx.compose.animation.core.tween // Import tween
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.clickable // Import clickable
-import androidx.compose.foundation.background // Import background
- import androidx.compose.material3.CircularProgressIndicator
- import androidx.compose.material3.Scaffold
- import androidx.compose.material3.Text // Import Text
- import androidx.compose.material3.LinearProgressIndicator // Import LinearProgressIndicator
- import androidx.compose.runtime.Composable
- import androidx.compose.runtime.LaunchedEffect // Import LaunchedEffect
- import androidx.compose.ui.input.pointer.pointerInput // Import pointerInput
- import androidx.compose.foundation.gestures.detectHorizontalDragGestures // Import detectHorizontalDragGestures
- import androidx.compose.foundation.gestures.detectVerticalDragGestures // Import detectVerticalDragGestures
- import androidx.compose.runtime.getValue // Import getValue
- import androidx.compose.ui.graphics.Color // Import Color
-import androidx.compose.runtime.mutableStateOf // Import mutableStateOf
-import androidx.compose.runtime.remember // Import remember
-import androidx.compose.runtime.setValue // Import setValue
-import android.content.Context // Import Context
-import android.content.SharedPreferences // Import SharedPreferences
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext // Import LocalContext
-import kotlinx.coroutines.delay // Import delay
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.example.movieposter.ui.MovieViewModel
 import com.example.movieposter.ui.theme.MoviePosterTheme
-import androidx.compose.runtime.collectAsState // Import collectAsState
-import androidx.compose.material3.AlertDialog // Import AlertDialog
-import androidx.compose.material3.Button // Import Button
-import androidx.compose.material3.ExperimentalMaterial3Api // Import ExperimentalMaterial3Api
-import androidx.compose.ui.window.Dialog // Import Dialog
-import androidx.compose.ui.window.DialogProperties // Import DialogProperties
-import androidx.compose.foundation.layout.fillMaxWidth // Import fillMaxWidth
-import androidx.compose.foundation.layout.padding // Import padding
-import androidx.compose.foundation.layout.wrapContentHeight // Import wrapContentHeight
-import androidx.compose.ui.viewinterop.AndroidView // Import AndroidView
-import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.YouTubePlayer // Import YouTubePlayer
-import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.listeners.AbstractYouTubePlayerListener // Import AbstractYouTubePlayerListener
-import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.options.IFramePlayerOptions;
-import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.views.YouTubePlayerView // Import YouTubePlayerView
-import androidx.compose.runtime.DisposableEffect // Import DisposableEffect
-import androidx.compose.ui.platform.LocalLifecycleOwner // Import LocalLifecycleOwner
-import androidx.lifecycle.Lifecycle // Import Lifecycle
-import androidx.lifecycle.LifecycleEventObserver // Import LifecycleEventObserver
-
-import androidx.compose.ui.graphics.graphicsLayer // Import graphicsLayer
+import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.YouTubePlayer
+import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.listeners.AbstractYouTubePlayerListener
+import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.options.IFramePlayerOptions
+import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.views.YouTubePlayerView
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class) // Add opt-in for ExperimentalMaterial3Api
 class MainActivity : ComponentActivity() {
@@ -176,7 +175,6 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
                 .clickable { isPaused = !isPaused } // Toggle pause state on click
                 .pointerInput(Unit) { // Add pointerInput for gesture detection
                     var horizontalDragAmount = 0f // Use separate drag amounts
-                    var verticalDragAmount = 0f
                     detectHorizontalDragGestures(
                         onHorizontalDrag = { change, dragAmountChange ->
                             horizontalDragAmount += dragAmountChange
@@ -225,8 +223,8 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
                         .height(4.dp), // Adjust height as needed
-                    color = androidx.compose.ui.graphics.Color(0.0f, 0.0f, 0.2f), // Explicit blue color (0% red, 0% green, 20% blue)
-                    trackColor = androidx.compose.ui.graphics.Color.Gray // Background color for the track
+                    color = Color(0xFF000033), // Dark blue color
+                    trackColor = Color.Gray // Background color for the track
                 )
 
                 // Button to show trailer
@@ -237,7 +235,7 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
                         }
                     },
                     modifier = Modifier
-                        .graphicsLayer { alpha = 0.25f } // Make button 25% translucent
+                        .alpha(0.25f) // Make button 25% translucent
                         .align(Alignment.BottomCenter)
                         .padding(bottom = 20.dp) // Add some padding from the bottom
                 ) {
@@ -255,28 +253,16 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
                     ) {
                         Box(modifier = Modifier
                             .fillMaxSize()
-                            .clickable { movieViewModel.clearTrailerKey() } // Add clickable modifier here
-                        ) { // New outer Box to fill the dialog area
-                            Box( // Original inner Box containing the YouTubePlayerView
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .wrapContentHeight()
-                                    .background(Color.Transparent)
-                                    .align(Alignment.BottomCenter) // Align this Box to the bottom center of the outer Box
-                           ) {
+                            .background(Color.Black.copy(alpha = 0.8f)) // Semi-transparent black background
+                            .clickable { movieViewModel.clearTrailerKey() } // Dismiss on click outside player
+                            , contentAlignment = Alignment.BottomCenter // Center the video player
+                        ) {
                                 val lifecycleOwner = LocalLifecycleOwner.current
                                 AndroidView(
                                     factory = { context ->
                                         YouTubePlayerView(context).apply {
-                                            enableAutomaticInitialization = false // Disable automatic initialization
+                                            enableAutomaticInitialization = false
                                             lifecycleOwner.lifecycle.addObserver(this)
-                                            addYouTubePlayerListener(object : AbstractYouTubePlayerListener() {
-                                                override fun onReady(youTubePlayer: YouTubePlayer) {
-                                                    trailerKey?.let { key ->
-                                                        youTubePlayer.loadVideo(key, 0f)
-                                                    }
-                                                }
-                                            })
                                             val options = IFramePlayerOptions.Builder().controls(0).rel(0).ivLoadPolicy(0).build()
                                             initialize(object : AbstractYouTubePlayerListener() {
                                                 override fun onReady(youTubePlayer: YouTubePlayer) {
@@ -298,5 +284,4 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
                 }
             }
         }
-    }
 }

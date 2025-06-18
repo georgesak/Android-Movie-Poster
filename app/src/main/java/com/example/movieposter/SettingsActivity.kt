@@ -5,16 +5,31 @@ import android.content.SharedPreferences
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.text.KeyboardOptions
 import com.example.movieposter.ui.theme.MoviePosterTheme
- 
+
 class SettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -31,10 +46,10 @@ class SettingsActivity : ComponentActivity() {
 fun SettingsScreen() {
     val context = LocalContext.current
     val sharedPreferences = context.getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
-    var transitionDelay by remember {
+    val (transitionDelay, setTransitionDelay) = remember {
         mutableStateOf(sharedPreferences.getLong("transition_delay", 10000L)) // Default to 10 seconds (10000ms)
     }
-    var apiKey by remember {
+    val (apiKey, setApiKey) = remember {
         mutableStateOf(sharedPreferences.getString("api_key", "") ?: "") // Default to empty string
     }
 
@@ -63,36 +78,31 @@ fun SettingsScreen() {
                         else -> seconds // Valid seconds
                     }
                     val milliseconds = validSeconds * 1000L
-                    transitionDelay = milliseconds // Update state in milliseconds
-                    with(sharedPreferences.edit()) {
-                        putLong("transition_delay", milliseconds) // Save in milliseconds
-                        apply()
-                    }
+                    setTransitionDelay(milliseconds) // Update state in milliseconds
+                    sharedPreferences.edit().putLong("transition_delay", milliseconds).apply() // Save in milliseconds
                 },
                 label = { Text("Delay") },
-                keyboardOptions = KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number) // Corrected usage
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number) // Corrected usage
             )
 
             Text("MovieDB API Key")
             OutlinedTextField(
                 value = apiKey,
                 onValueChange = { newValue ->
-                    apiKey = newValue
-                    with(sharedPreferences.edit()) {
-                        putString("api_key", newValue)
-                        apply()
-                    }
+                    setApiKey(newValue)
+                    sharedPreferences.edit().putString("api_key", newValue).apply()
                 },
                 label = { Text("API Key") }
             )
 
-            Spacer(modifier = Modifier.weight(1f)) // Push the button to the bottom
             Button(
                 onClick = {
                     val intent = android.content.Intent(context, MainActivity::class.java)
                     context.startActivity(intent)
                 },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp) // Add some top padding to separate from fields
             ) {
                 Text("Save and Return to Slideshow")
             }

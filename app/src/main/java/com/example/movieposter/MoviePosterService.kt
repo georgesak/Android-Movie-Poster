@@ -12,7 +12,9 @@ import androidx.core.app.NotificationCompat
 
 class MoviePosterService : Service() {
 
-    private val CHANNEL_ID = "MoviePosterServiceChannel"
+    companion object {
+        private const val CHANNEL_ID = "MoviePosterServiceChannel"
+    }
 
     override fun onCreate() {
         super.onCreate()
