@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">MoviePoster</string>
+    <string name="settings_activity_label">Settings</string> // Added settings activity label
+</resources>
