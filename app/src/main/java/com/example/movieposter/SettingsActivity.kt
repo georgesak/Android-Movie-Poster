@@ -38,6 +38,8 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Checkbox
 import androidx.compose.foundation.layout.Row
 import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 
 class SettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -75,15 +77,17 @@ fun SettingsScreen(movieViewModel: MovieViewModel = viewModel()) {
             TopAppBar(title = { Text("Settings") })
         }
     ) { paddingValues ->
+        val scrollState = rememberScrollState()
         Column(
             modifier = Modifier
                 .padding(paddingValues)
                 .padding(16.dp)
-                .fillMaxSize(),
+                .fillMaxSize()
+                .verticalScroll(scrollState),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text("Transition Delay (seconds)")
+            Text("Transition Delay (10 to 600 seconds)")
             OutlinedTextField(
                 value = (transitionDelay / 1000L).toString(),
                 onValueChange = { newValue ->
