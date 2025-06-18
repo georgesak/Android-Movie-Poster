@@ -13,6 +13,15 @@ data class MovieResponse(
     val results: List<Movie>
 )
 
+data class Genre(
+    val id: Int,
+    val name: String
+)
+
+data class GenreResponse(
+    val genres: List<Genre>
+)
+
 data class Video(
     val key: String, // YouTube video key
     val site: String, // e.g., "YouTube"

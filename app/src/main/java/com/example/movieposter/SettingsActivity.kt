@@ -28,7 +28,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.movieposter.data.Genre
+import com.example.movieposter.ui.MovieViewModel
 import com.example.movieposter.ui.theme.MoviePosterTheme
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material3.Checkbox
+import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.semantics.Role
 
 class SettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -41,16 +50,24 @@ class SettingsActivity : ComponentActivity() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class) // Suppress experimental API warning for TopAppBar
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(movieViewModel: MovieViewModel = viewModel()) {
     val context = LocalContext.current
     val sharedPreferences = context.getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
+
     val (transitionDelay, setTransitionDelay) = remember {
-        mutableStateOf(sharedPreferences.getLong("transition_delay", 10000L)) // Default to 10 seconds (10000ms)
+        mutableStateOf(sharedPreferences.getLong("transition_delay", 10000L))
     }
     val (apiKey, setApiKey) = remember {
-        mutableStateOf(sharedPreferences.getString("api_key", "") ?: "") // Default to empty string
+        mutableStateOf(sharedPreferences.getString("api_key", "") ?: "")
+    }
+
+    val genres by movieViewModel.genres
+    val (selectedGenreIds, setSelectedGenreIds) = remember {
+        val savedGenreIds = sharedPreferences.getStringSet("selected_genre_ids", emptySet())
+            ?.mapNotNull { it.toIntOrNull() }?.toSet() ?: emptySet()
+        mutableStateOf(savedGenreIds)
     }
 
     Scaffold(
@@ -66,23 +83,23 @@ fun SettingsScreen() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text("Transition Delay (seconds)") // Changed label to seconds
+            Text("Transition Delay (seconds)")
             OutlinedTextField(
-                value = (transitionDelay / 1000L).toString(), // Display in seconds
+                value = (transitionDelay / 1000L).toString(),
                 onValueChange = { newValue ->
                     val seconds = newValue.toLongOrNull()
                     val validSeconds = when {
-                        seconds == null -> 10L // Default to 10 seconds if parsing fails
-                        seconds < 10L -> 10L // Minimum 10 seconds
-                        seconds > 600L -> 600L // Maximum 600 seconds
-                        else -> seconds // Valid seconds
+                        seconds == null -> 10L
+                        seconds < 10L -> 10L
+                        seconds > 600L -> 600L
+                        else -> seconds
                     }
                     val milliseconds = validSeconds * 1000L
-                    setTransitionDelay(milliseconds) // Update state in milliseconds
-                    sharedPreferences.edit().putLong("transition_delay", milliseconds).apply() // Save in milliseconds
+                    setTransitionDelay(milliseconds)
+                    sharedPreferences.edit().putLong("transition_delay", milliseconds).apply()
                 },
                 label = { Text("Delay") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number) // Corrected usage
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
             )
 
             Text("MovieDB API Key")
@@ -95,14 +112,72 @@ fun SettingsScreen() {
                 label = { Text("API Key") }
             )
 
+            Text("Movie Genre(s)")
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .toggleable(
+                            value = selectedGenreIds.isEmpty() || selectedGenreIds.contains(0),
+                            onValueChange = {
+                                setSelectedGenreIds(setOf(0))
+                                sharedPreferences.edit().putStringSet("selected_genre_ids", setOf("0")).apply()
+                            },
+                            role = Role.Checkbox
+                        )
+                        .padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = selectedGenreIds.isEmpty() || selectedGenreIds.contains(0),
+                            onCheckedChange = null // null recommended for accessibility with toggleable
+                    )
+                    Text("All")
+                }
+                genres.forEach { genre ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .toggleable(
+                                value = selectedGenreIds.contains(genre.id),
+                                onValueChange = {
+                                    val newSelection = if (selectedGenreIds.contains(genre.id)) {
+                                        selectedGenreIds - genre.id
+                                    } else {
+                                        selectedGenreIds + genre.id
+                                    }
+                                    setSelectedGenreIds(newSelection.filter { it != 0 }.toSet())
+                                    sharedPreferences.edit().putStringSet("selected_genre_ids", newSelection.map { it.toString() }.toSet()).apply()
+                                },
+                                role = Role.Checkbox
+                            )
+                            .padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = selectedGenreIds.contains(genre.id),
+                            onCheckedChange = null // null recommended for accessibility with toggleable
+                        )
+                        Text(genre.name)
+                    }
+                }
+            }
+
             Button(
                 onClick = {
+                    val savedGenreIds = sharedPreferences.getStringSet("selected_genre_ids", emptySet())
+                        ?.mapNotNull { it.toIntOrNull() }?.toSet() ?: emptySet()
+                    movieViewModel.getPopularMovies(savedGenreIds)
                     val intent = android.content.Intent(context, MainActivity::class.java)
                     context.startActivity(intent)
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 16.dp) // Add some top padding to separate from fields
+                    .padding(top = 16.dp)
             ) {
                 Text("Save and Return to Slideshow")
             }

@@ -136,30 +136,34 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
     val context = LocalContext.current // Get the current context
     val sharedPreferences = context.getSharedPreferences("AppSettings", Context.MODE_PRIVATE) // Get SharedPreferences
     val transitionDelay = sharedPreferences.getLong("transition_delay", 10000L) // Read transition delay (default 10 seconds)
-    var progress by remember { mutableStateOf(0f) } // State to track progress (0f to 1f)
-    val trailerKey by movieViewModel.trailerKey.collectAsState() // Observe the trailer key
-    var swipeTrigger by remember { mutableStateOf(0) } // State to trigger LaunchedEffect on swipe
+    val selectedGenreIds = remember {
+        mutableStateOf(sharedPreferences.getStringSet("selected_genre_ids", emptySet())?.mapNotNull { it.toIntOrNull() }?.toSet() ?: emptySet())
+    }
+    var progress by remember { mutableStateOf(0f) }
+    val trailerKey by movieViewModel.trailerKey.collectAsState()
+    var swipeTrigger by remember { mutableStateOf(0) }
 
-    // Pause slideshow when trailer is shown
     LaunchedEffect(trailerKey) {
         isPaused = trailerKey != null
     }
 
-    // Auto-cycle the posters and update progress
-    LaunchedEffect(movies, transitionDelay, isPaused, swipeTrigger) { // Add swipeTrigger as a key
+    LaunchedEffect(movies, transitionDelay, isPaused, swipeTrigger, selectedGenreIds.value) {
+        val currentSavedGenreIds = sharedPreferences.getStringSet("selected_genre_ids", emptySet())?.mapNotNull { it.toIntOrNull() }?.toSet() ?: emptySet()
+        if (movies.isEmpty() || selectedGenreIds.value != currentSavedGenreIds) {
+            selectedGenreIds.value = currentSavedGenreIds
+            movieViewModel.getPopularMovies(selectedGenreIds.value)
+        }
         if (movies.isNotEmpty()) {
             while (true) {
                 if (!isPaused) {
-                    // Update progress
-                    val totalSteps = transitionDelay / 100L // Update progress every 100ms
+                    val totalSteps = transitionDelay / 100L
                     for (i in 0..totalSteps) {
                         progress = i.toFloat() / totalSteps.toFloat()
                         delay(100)
                     }
                     currentMovieIndex = (currentMovieIndex + 1) % movies.size
-                    progress = 0f // Reset progress for the next image
+                    progress = 0f
                 } else {
-                    // If paused, just delay to prevent the coroutine from finishing
                     delay(100)
                 }
             }

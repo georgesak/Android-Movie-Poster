@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.movieposter.data.Genre
 import com.example.movieposter.data.Movie
 import com.example.movieposter.network.ApiService
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,6 +21,9 @@ class MovieViewModel(application: Application) : AndroidViewModel(application) {
     private val _movies = mutableStateOf<List<Movie>>(emptyList())
     val movies: State<List<Movie>> = _movies
 
+    private val _genres = mutableStateOf<List<Genre>>(emptyList())
+    val genres: State<List<Genre>> = _genres
+
     private val _trailerKey = MutableStateFlow<String?>(null)
     val trailerKey: StateFlow<String?> = _trailerKey
 
@@ -32,6 +36,7 @@ class MovieViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     init {
+        getMovieGenres()
         getPopularMovies()
     }
 
@@ -40,24 +45,47 @@ class MovieViewModel(application: Application) : AndroidViewModel(application) {
         return sharedPreferences.getString("api_key", "") ?: ""
     }
 
-    private fun getPopularMovies() {
+    fun getPopularMovies(genreIds: Set<Int>? = null) {
         viewModelScope.launch {
             try {
-                val apiKey = getApiKey() // Get API key from SharedPreferences
+                val apiKey = getApiKey()
                 if (apiKey.isNotEmpty()) {
-                    val response = apiService.getPopularMovies(apiKey)
+                    val response = if (genreIds != null && genreIds.isNotEmpty() && !genreIds.contains(0)) {
+                        apiService.getMoviesByGenres(apiKey, genreIds.joinToString("|"))
+                    } else {
+                        apiService.getPopularMovies(apiKey)
+                    }
+
                     if (response.isSuccessful) {
                         _movies.value = response.body()?.results ?: emptyList()
                     } else {
-                        // Handle error
                         println("Error fetching movies: ${response.errorBody()}")
                     }
                 } else {
                     println("API Key is not set.")
                 }
             } catch (e: Exception) {
-                // Handle exception
                 println("Exception fetching movies: ${e.message}")
+            }
+        }
+    }
+
+    private fun getMovieGenres() {
+        viewModelScope.launch {
+            try {
+                val apiKey = getApiKey()
+                if (apiKey.isNotEmpty()) {
+                    val response = apiService.getMovieGenres(apiKey)
+                    if (response.isSuccessful) {
+                        _genres.value = response.body()?.genres ?: emptyList()
+                    } else {
+                        println("Error fetching genres: ${response.errorBody()}")
+                    }
+                } else {
+                    println("API Key is not set.")
+                }
+            } catch (e: Exception) {
+                println("Exception fetching genres: ${e.message}")
             }
         }
     }
