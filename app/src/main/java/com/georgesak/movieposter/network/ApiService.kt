@@ -13,7 +13,7 @@ interface ApiService {
     suspend fun getMoviesByGenres(
         @Query("api_key") apiKey: String,
         @Query("with_genres") genreIds: String, // Comma-separated genre IDs
-        @Query("language") language: String = "en-US" // Add language parameter with default
+        @Query("with_original_language") language: String = "en" // Add language parameter with default
     ): Response<MovieResponse>
 
     @GET("genre/movie/list") // Endpoint for movie genre list
