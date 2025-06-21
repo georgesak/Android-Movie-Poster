@@ -355,6 +355,15 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
                                                         youTubePlayer.loadVideo(key, 0f)
                                                     }
                                                 }
+
+                                                override fun onStateChange(
+                                                    youTubePlayer: YouTubePlayer,
+                                                    state: com.pierfrancescosoffritti.androidyoutubeplayer.core.player.PlayerConstants.PlayerState
+                                                ) {
+                                                    if (state == com.pierfrancescosoffritti.androidyoutubeplayer.core.player.PlayerConstants.PlayerState.ENDED) {
+                                                        movieViewModel.clearTrailerKey()
+                                                    }
+                                                }
                                             }, options)
                                         }
                                     },

@@ -53,7 +53,7 @@ class MovieViewModel(application: Application) : AndroidViewModel(application) {
                     val response = if (genreIds != null && genreIds.isNotEmpty() && !genreIds.contains(0)) {
                         apiService.getMoviesByGenres(apiKey, genreIds.joinToString("|"))
                     } else {
-                        apiService.getPopularMovies(apiKey)
+                        apiService.getMoviesByGenres(apiKey, "")
                     }
 
                     if (response.isSuccessful) {

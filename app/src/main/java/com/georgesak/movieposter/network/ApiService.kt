@@ -9,15 +9,11 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface ApiService {
-    @GET("movie/popular")
-    suspend fun getPopularMovies(
-        @Query("api_key") apiKey: String
-    ): Response<MovieResponse>
-
     @GET("discover/movie")
     suspend fun getMoviesByGenres(
         @Query("api_key") apiKey: String,
-        @Query("with_genres") genreIds: String // Comma-separated genre IDs
+        @Query("with_genres") genreIds: String, // Comma-separated genre IDs
+        @Query("language") language: String = "en-US" // Add language parameter with default
     ): Response<MovieResponse>
 
     @GET("genre/movie/list") // Endpoint for movie genre list
