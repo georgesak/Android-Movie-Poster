@@ -97,6 +97,14 @@ fun saveSettings(
                 actions = {
                     Button(
                         onClick = {
+                            (context as? ComponentActivity)?.finishAffinity()
+                        },
+                        modifier = Modifier.padding(end = 8.dp)
+                    ) {
+                        Text("Quit")
+                    }
+                    Button(
+                        onClick = {
                             // Navigate back to MainActivity without saving
                             val intent = android.content.Intent(context, MainActivity::class.java)
                             context.startActivity(intent)

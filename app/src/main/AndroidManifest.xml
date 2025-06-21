@@ -3,9 +3,6 @@
     xmlns:tools="http://schemas.android.com/tools">
 
 <uses-permission android:name="android.permission.INTERNET"/>
-<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/> // For Android 13+
-<uses-permission android:name="android.permission.FOREGROUND_SERVICE"/> // For persistent notification
-<uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
  
     <application
         android:allowBackup="true"
@@ -33,10 +30,6 @@
             android:label="@string/settings_activity_label"
             android:theme="@style/Theme.MoviePoster">
         </activity>
-        <service
-            android:name=".MoviePosterService"
-            android:foregroundServiceType="mediaPlayback"
-            android:exported="false" /> // Specify foreground service type
     </application>
  
 </manifest>

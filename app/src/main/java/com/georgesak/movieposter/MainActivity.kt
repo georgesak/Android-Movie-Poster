@@ -11,53 +11,53 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.georgesak.movieposter.ui.MovieViewModel
 import com.georgesak.movieposter.ui.theme.MoviePosterTheme
@@ -66,6 +66,7 @@ import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.listeners.Abs
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.options.IFramePlayerOptions
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.views.YouTubePlayerView
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class) // Add opt-in for ExperimentalMaterial3Api
 class MainActivity : ComponentActivity() {
@@ -91,14 +92,6 @@ class MainActivity : ComponentActivity() {
                 ) {
                     requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                 }
-            }
-
-            // Start the foreground service
-            val serviceIntent = Intent(this, MoviePosterService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(serviceIntent)
-            } else {
-                startService(serviceIntent)
             }
 
             setContent {
@@ -142,6 +135,8 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
     var progress by remember { mutableStateOf(0f) }
     val trailerKey by movieViewModel.trailerKey.collectAsState()
     var swipeTrigger by remember { mutableStateOf(0) }
+    val scope = rememberCoroutineScope()
+    val dragOffset = remember { Animatable(0f) }
 
     LaunchedEffect(trailerKey) {
         isPaused = trailerKey != null
@@ -178,26 +173,35 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
                 .background(Color.Black) // Set background color to black
                 .clickable { isPaused = !isPaused } // Toggle pause state on click
                 .pointerInput(Unit) { // Add pointerInput for gesture detection
-                    var horizontalDragAmount = 0f // Use separate drag amounts
                     detectHorizontalDragGestures(
                         onHorizontalDrag = { change, dragAmountChange ->
-                            horizontalDragAmount += dragAmountChange
+                            scope.launch {
+                                dragOffset.snapTo(dragOffset.value + dragAmountChange)
+                            }
                             change.consume()
                         },
                         onDragEnd = {
-                            val swipeThreshold = 100 // Define a swipe threshold in pixels
-                            if (horizontalDragAmount < -swipeThreshold) { // Check for a left swipe
-                                currentMovieIndex = (currentMovieIndex + 1) % movies.size
-                                progress = 0f // Reset progress on swipe
-                                isPaused = false // Unpause on swipe
-                                swipeTrigger = (swipeTrigger + 1) % 2 // Trigger LaunchedEffect
-                            } else if (horizontalDragAmount > swipeThreshold) { // Check for a right swipe
-                                currentMovieIndex = (currentMovieIndex - 1 + movies.size) % movies.size
-                                progress = 0f // Reset progress on swipe
-                                isPaused = false // Unpause on swipe
-                                swipeTrigger = (swipeTrigger + 1) % 2 // Trigger LaunchedEffect
+                            val swipeThreshold = size.width * 0.4f
+                            scope.launch {
+                                if (dragOffset.value < -swipeThreshold) { // Check for a left swipe
+                                    dragOffset.animateTo(-size.width.toFloat(), animationSpec = tween(durationMillis = 300))
+                                    currentMovieIndex = (currentMovieIndex + 1) % movies.size
+                                    progress = 0f // Reset progress on swipe
+                                    isPaused = false // Unpause on swipe
+                                    swipeTrigger = (swipeTrigger + 1) % 2 // Trigger LaunchedEffect
+                                    dragOffset.snapTo(0f) // Snap immediately to 0 after index change
+                                } else if (dragOffset.value > swipeThreshold) { // Check for a right swipe
+                                    dragOffset.animateTo(size.width.toFloat(), animationSpec = tween(durationMillis = 300))
+                                    currentMovieIndex = (currentMovieIndex - 1 + movies.size) % movies.size
+                                    progress = 0f // Reset progress on swipe
+                                    isPaused = false // Unpause on swipe
+                                    swipeTrigger = (swipeTrigger + 1) % 2 // Trigger LaunchedEffect
+                                    dragOffset.snapTo(0f) // Snap immediately to 0 after index change
+                                } else {
+                                    // Snap back if threshold not met
+                                    dragOffset.animateTo(0f, animationSpec = tween(durationMillis = 300))
+                                }
                             }
-                            horizontalDragAmount = 0f // Reset drag amount
                         }
                     )
                 },
@@ -206,18 +210,52 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
             if (movies.isEmpty()) {
                 CircularProgressIndicator()
             } else {
-                Crossfade(
-                    targetState = movies[currentMovieIndex],
-                    animationSpec = tween(durationMillis = 1000) // Fade duration
-                ) { movie ->
-                    // Assuming a base URL for the poster images
-                    val imageUrl = "https://image.tmdb.org/t/p/w500${movie.posterPath}"
+                BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                    val fullWidth = constraints.maxWidth.toFloat()
+
+                    val currentMovie = movies[currentMovieIndex]
+                    val nextMovie = movies[(currentMovieIndex + 1) % movies.size]
+                    val previousMovie = movies[(currentMovieIndex - 1 + movies.size) % movies.size]
+
+                    // Render previous movie (appears from left when dragging right)
+                    if (dragOffset.value > 0f) {
+                        AsyncImage(
+                            model = "https://image.tmdb.org/t/p/w500${previousMovie.posterPath}",
+                            contentDescription = previousMovie.title,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer {
+                                    translationX = dragOffset.value - fullWidth
+                                    alpha = (dragOffset.value / fullWidth).coerceIn(0f, 1f)
+                                },
+                            contentScale = ContentScale.Fit
+                        )
+                    }
+
+                    // Render current movie
                     AsyncImage(
-                        model = imageUrl,
-                        contentDescription = movie.title,
-                        modifier = Modifier.fillMaxSize(), // Make image fill the screen
-                        contentScale = ContentScale.Fit // Scale the image to fit the bounds while maintaining aspect ratio
+                        model = "https://image.tmdb.org/t/p/w500${currentMovie.posterPath}",
+                        contentDescription = currentMovie.title,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer { translationX = dragOffset.value },
+                        contentScale = ContentScale.Fit
                     )
+
+                    // Render next movie (appears from right when dragging left)
+                    if (dragOffset.value < 0f) {
+                        AsyncImage(
+                            model = "https://image.tmdb.org/t/p/w500${nextMovie.posterPath}",
+                            contentDescription = nextMovie.title,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer {
+                                    translationX = fullWidth + dragOffset.value
+                                    alpha = (kotlin.math.abs(dragOffset.value) / fullWidth).coerceIn(0f, 1f)
+                                },
+                            contentScale = ContentScale.Fit
+                        )
+                    }
                 }
 
                 // Progress bar at the bottom
@@ -226,26 +264,45 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .height(4.dp), // Adjust height as needed
-                    color = Color(0xFF000033), // Dark blue color
+                        .height(2.dp), // Adjust height as needed
+                    color = Color(0xFF202020), // Dark blue color
                     trackColor = Color.Gray // Background color for the track
                 )
 
                 // Button to show trailer
-                Button(
+                IconButton(
                     onClick = {
                         if (movies.isNotEmpty()) {
                             movieViewModel.getMovieTrailer(movies[currentMovieIndex].id)
                         }
                     },
                     modifier = Modifier
-                        .alpha(0.25f) // Make button 25% translucent
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 20.dp) // Add some padding from the bottom
+                        .alpha(0.25f)
+                        .align(Alignment.BottomEnd)
+                        .padding(bottom = 20.dp, end = 20.dp) // Add some padding from the bottom and right
                 ) {
                     Icon(
-                        imageVector = Icons.Default.PlayArrow,
-                        contentDescription = "Play Trailer"
+                        imageVector = Icons.Default.Movie,
+                        contentDescription = "Play Trailer",
+                        tint = Color.White // Set icon color to white for visibility
+                    )
+                }
+
+                // Button to open settings
+                IconButton(
+                    onClick = {
+                        val settingsIntent = Intent(context, SettingsActivity::class.java)
+                        context.startActivity(settingsIntent)
+                    },
+                    modifier = Modifier
+                        .alpha(0.25f)
+                        .align(Alignment.BottomStart) // Align to bottom left
+                        .padding(bottom = 20.dp, start = 20.dp) // Add some padding from the bottom and left
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = "Open Settings",
+                        tint = Color.White // Set icon color to white for visibility
                     )
                 }
 
