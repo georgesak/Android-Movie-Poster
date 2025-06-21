@@ -12,6 +12,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -31,6 +33,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ProgressIndicatorDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -133,17 +136,18 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
     val selectedGenreIds = remember {
         mutableStateOf(sharedPreferences.getStringSet("selected_genre_ids", emptySet())?.mapNotNull { it.toIntOrNull() }?.toSet() ?: emptySet())
     }
-    var progress by remember { mutableStateOf(0f) }
+    val progress = remember { Animatable(0f) }
     val trailerKey by movieViewModel.trailerKey.collectAsState()
     var swipeTrigger by remember { mutableStateOf(0) }
     val scope = rememberCoroutineScope()
     val dragOffset = remember { Animatable(0f) }
+    var isAnimatingSwipe by remember { mutableStateOf(false) }
 
     LaunchedEffect(trailerKey) {
         isPaused = trailerKey != null
     }
 
-    LaunchedEffect(movies, transitionDelay, isPaused, swipeTrigger, selectedGenreIds.value) {
+    LaunchedEffect(movies, transitionDelay, isPaused, swipeTrigger, selectedGenreIds.value, isAnimatingSwipe) {
         val currentSavedGenreIds = sharedPreferences.getStringSet("selected_genre_ids", emptySet())?.mapNotNull { it.toIntOrNull() }?.toSet() ?: emptySet()
         if (movies.isEmpty() || selectedGenreIds.value != currentSavedGenreIds) {
             selectedGenreIds.value = currentSavedGenreIds
@@ -151,16 +155,12 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
         }
         if (movies.isNotEmpty()) {
             while (true) {
-                if (!isPaused) {
-                    val totalSteps = transitionDelay / 100L
-                    for (i in 0..totalSteps) {
-                        progress = i.toFloat() / totalSteps.toFloat()
-                        delay(100)
-                    }
+                if (!isPaused && !isAnimatingSwipe) {
+                    progress.animateTo(1f, animationSpec = tween(durationMillis = transitionDelay.toInt(), easing = LinearEasing))
                     currentMovieIndex = (currentMovieIndex + 1) % movies.size
-                    progress = 0f
+                    progress.snapTo(0f)
                 } else {
-                    delay(100)
+                    delay(1000)
                 }
             }
         }
@@ -177,31 +177,43 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
                     detectHorizontalDragGestures(
                         onHorizontalDrag = { change, dragAmountChange ->
                             scope.launch {
+                                // Pause auto-advance during drag
+                                isPaused = true
                                 dragOffset.snapTo(dragOffset.value + dragAmountChange)
                             }
                             change.consume()
                         },
                         onDragEnd = {
-                            val swipeThreshold = size.width * 0.43
+                            val swipeThreshold = size.width * 0.43f
                             scope.launch {
-                                if (dragOffset.value < -swipeThreshold) { // Check for a left swipe
-                                    dragOffset.animateTo(-size.width.toFloat(), animationSpec = tween(durationMillis = 300))
-                                    currentMovieIndex = (currentMovieIndex + 1) % movies.size
-                                    progress = 0f // Reset progress on swipe
-                                    isPaused = false // Unpause on swipe
-                                    swipeTrigger = (swipeTrigger + 1) % 2 // Trigger LaunchedEffect
-                                    dragOffset.snapTo(0f) // Snap immediately to 0 after index change
-                                } else if (dragOffset.value > swipeThreshold) { // Check for a right swipe
-                                    dragOffset.animateTo(size.width.toFloat(), animationSpec = tween(durationMillis = 300))
-                                    currentMovieIndex = (currentMovieIndex - 1 + movies.size) % movies.size
-                                    progress = 0f // Reset progress on swipe
-                                    isPaused = false // Unpause on swipe
-                                    swipeTrigger = (swipeTrigger + 1) % 2 // Trigger LaunchedEffect
-                                    dragOffset.snapTo(0f) // Snap immediately to 0 after index change
-                                } else {
-                                    // Snap back if threshold not met
-                                    dragOffset.animateTo(0f, animationSpec = tween(durationMillis = 300))
+                                isAnimatingSwipe = true // Indicate that a swipe animation is starting
+                                val targetOffset = when {
+                                    dragOffset.value < -swipeThreshold -> -size.width.toFloat()
+                                    dragOffset.value > swipeThreshold -> size.width.toFloat()
+                                    else -> 0f
                                 }
+
+                                dragOffset.animateTo(targetOffset, animationSpec = tween(durationMillis = 300))
+
+                                if (targetOffset != 0f) {
+                                    currentMovieIndex = if (targetOffset < 0) { // Swiped left
+                                        (currentMovieIndex + 1) % movies.size
+                                    } else { // Swiped right
+                                        (currentMovieIndex - 1 + movies.size) % movies.size
+                                    }
+                                }
+                                dragOffset.snapTo(0f) // Reset dragOffset to 0 for the new current movie
+                                progress.snapTo(0f) // Reset progress on swipe
+                                isPaused = false // Unpause after swipe animation
+                                swipeTrigger = (swipeTrigger + 1) % 2 // Trigger LaunchedEffect
+                                isAnimatingSwipe = false // Indicate that swipe animation has ended
+                            }
+                        },
+                        onDragCancel = {
+                            scope.launch {
+                                dragOffset.animateTo(0f, animationSpec = tween(durationMillis = 300))
+                                isPaused = false // Unpause on cancel
+                                isAnimatingSwipe = false // Reset animation state
                             }
                         }
                     )
@@ -223,14 +235,13 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
                         AsyncImage(
                             model = ImageRequest.Builder(LocalContext.current)
                                 .data("https://image.tmdb.org/t/p/w500${previousMovie.posterPath}")
-                                .crossfade(true)
+                                .crossfade(1000) // Slow down fade effect to 1 second
                                 .build(),
                             contentDescription = previousMovie.title,
                             modifier = Modifier
                                 .fillMaxSize()
                                 .graphicsLayer {
                                     translationX = dragOffset.value - fullWidth
-                                    alpha = (dragOffset.value / fullWidth).coerceIn(0f, 1f)
                                 },
                             contentScale = ContentScale.Fit
                         )
@@ -240,7 +251,7 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
                     AsyncImage(
                         model = ImageRequest.Builder(LocalContext.current)
                             .data("https://image.tmdb.org/t/p/w500${currentMovie.posterPath}")
-                            .crossfade(true)
+                            .crossfade(1000) // Slow down fade effect to 1 second
                             .build(),
                         contentDescription = currentMovie.title,
                         modifier = Modifier
@@ -254,14 +265,13 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
                         AsyncImage(
                             model = ImageRequest.Builder(LocalContext.current)
                                 .data("https://image.tmdb.org/t/p/w500${nextMovie.posterPath}")
-                                .crossfade(true)
+                                .crossfade(1000) // Slow down fade effect to 1 second
                                 .build(),
                             contentDescription = nextMovie.title,
                             modifier = Modifier
                                 .fillMaxSize()
                                 .graphicsLayer {
                                     translationX = fullWidth + dragOffset.value
-                                    alpha = (kotlin.math.abs(dragOffset.value) / fullWidth).coerceIn(0f, 1f)
                                 },
                             contentScale = ContentScale.Fit
                         )
@@ -269,14 +279,18 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
                 }
 
                 // Progress bar at the bottom
+                val animatedProgress by animateFloatAsState(
+                    targetValue = progress.value,
+                    animationSpec = ProgressIndicatorDefaults.ProgressAnimationSpec, label = "progressAnimation"
+                )
                 LinearProgressIndicator(
-                    progress = progress,
+                    progress = animatedProgress,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
                         .height(2.dp), // Adjust height as needed
                     color = Color(0xFF202020), // Dark blue color
-                    trackColor = Color.Gray // Background color for the track
+                    trackColor = Color.Black, // Background color for the track
                 )
 
                 // Button to show trailer
@@ -288,8 +302,8 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
                     },
                     modifier = Modifier
                         .alpha(0.25f)
-                        .align(Alignment.BottomEnd)
-                        .padding(bottom = 20.dp, end = 20.dp) // Add some padding from the bottom and right
+                        .align(Alignment.BottomStart)
+                        .padding(bottom = 20.dp, start = 20.dp) // Add some padding from the bottom and right
                 ) {
                     Icon(
                         imageVector = Icons.Default.Movie,
@@ -306,8 +320,8 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
                     },
                     modifier = Modifier
                         .alpha(0.25f)
-                        .align(Alignment.BottomStart) // Align to bottom left
-                        .padding(bottom = 20.dp, start = 20.dp) // Add some padding from the bottom and left
+                        .align(Alignment.BottomEnd) // Align to bottom left
+                        .padding(bottom = 20.dp, end = 20.dp) // Add some padding from the bottom and left
                 ) {
                     Icon(
                         imageVector = Icons.Default.Settings,
