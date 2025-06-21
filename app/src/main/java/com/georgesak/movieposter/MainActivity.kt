@@ -59,6 +59,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.georgesak.movieposter.ui.MovieViewModel
 import com.georgesak.movieposter.ui.theme.MoviePosterTheme
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.YouTubePlayer
@@ -181,7 +182,7 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
                             change.consume()
                         },
                         onDragEnd = {
-                            val swipeThreshold = size.width * 0.4f
+                            val swipeThreshold = size.width * 0.43
                             scope.launch {
                                 if (dragOffset.value < -swipeThreshold) { // Check for a left swipe
                                     dragOffset.animateTo(-size.width.toFloat(), animationSpec = tween(durationMillis = 300))
@@ -220,7 +221,10 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
                     // Render previous movie (appears from left when dragging right)
                     if (dragOffset.value > 0f) {
                         AsyncImage(
-                            model = "https://image.tmdb.org/t/p/w500${previousMovie.posterPath}",
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data("https://image.tmdb.org/t/p/w500${previousMovie.posterPath}")
+                                .crossfade(true)
+                                .build(),
                             contentDescription = previousMovie.title,
                             modifier = Modifier
                                 .fillMaxSize()
@@ -234,7 +238,10 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
 
                     // Render current movie
                     AsyncImage(
-                        model = "https://image.tmdb.org/t/p/w500${currentMovie.posterPath}",
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data("https://image.tmdb.org/t/p/w500${currentMovie.posterPath}")
+                            .crossfade(true)
+                            .build(),
                         contentDescription = currentMovie.title,
                         modifier = Modifier
                             .fillMaxSize()
@@ -245,7 +252,10 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
                     // Render next movie (appears from right when dragging left)
                     if (dragOffset.value < 0f) {
                         AsyncImage(
-                            model = "https://image.tmdb.org/t/p/w500${nextMovie.posterPath}",
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data("https://image.tmdb.org/t/p/w500${nextMovie.posterPath}")
+                                .crossfade(true)
+                                .build(),
                             contentDescription = nextMovie.title,
                             modifier = Modifier
                                 .fillMaxSize()
