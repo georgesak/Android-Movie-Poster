@@ -1,6 +1,6 @@
 # MoviePoster
 
-This is an Android application for displaying movie posters.
+This is an Android application for displaying movie posters. It pulls the most popular movies from The Movie Database (TMDB) and creates a rotating digital movie poster. The user can set the delay between transitions (10s to 600s) as well as filter out movies by genres. The user can also interact with the posters by scrolling left/right to change posters, clicking on the poster to pause it as well as play the trailer using the button on the bottom left.
 
 ## API Key
 
