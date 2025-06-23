@@ -12,8 +12,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -22,18 +20,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.ProgressIndicatorDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -136,7 +132,6 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
     val selectedGenreIds = remember {
         mutableStateOf(sharedPreferences.getStringSet("selected_genre_ids", emptySet())?.mapNotNull { it.toIntOrNull() }?.toSet() ?: emptySet())
     }
-    val progress = remember { Animatable(0f) }
     val trailerKey by movieViewModel.trailerKey.collectAsState()
     var swipeTrigger by remember { mutableStateOf(0) }
     val scope = rememberCoroutineScope()
@@ -156,11 +151,10 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
         if (movies.isNotEmpty()) {
             while (true) {
                 if (!isPaused && !isAnimatingSwipe) {
-                    progress.animateTo(1f, animationSpec = tween(durationMillis = transitionDelay.toInt(), easing = LinearEasing))
+                    delay(transitionDelay) // Use delay directly
                     currentMovieIndex = (currentMovieIndex + 1) % movies.size
-                    progress.snapTo(0f)
                 } else {
-                    delay(1000)
+                    delay(100)
                 }
             }
         }
@@ -203,7 +197,6 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
                                     }
                                 }
                                 dragOffset.snapTo(0f) // Reset dragOffset to 0 for the new current movie
-                                progress.snapTo(0f) // Reset progress on swipe
                                 isPaused = false // Unpause after swipe animation
                                 swipeTrigger = (swipeTrigger + 1) % 2 // Trigger LaunchedEffect
                                 isAnimatingSwipe = false // Indicate that swipe animation has ended
@@ -278,20 +271,6 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
                     }
                 }
 
-                // Progress bar at the bottom
-                val animatedProgress by animateFloatAsState(
-                    targetValue = progress.value,
-                    animationSpec = ProgressIndicatorDefaults.ProgressAnimationSpec, label = "progressAnimation"
-                )
-                LinearProgressIndicator(
-                    progress = animatedProgress,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .height(2.dp), // Adjust height as needed
-                    color = Color(0xFF202020), // Dark blue color
-                    trackColor = Color.Black, // Background color for the track
-                )
 
                 // Button to show trailer
                 IconButton(
@@ -330,6 +309,19 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
                     )
                 }
 
+                // Paused indicator
+                if (isPaused) {
+                    Icon(
+                        imageVector = Icons.Default.Pause,
+                        contentDescription = "Paused",
+                        tint = Color.White,
+                        modifier = Modifier
+                            .alpha(0.25f) // Make it 25% translucent
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 20.dp)
+                    )
+                }
+
                 // Display trailer dialog if trailerKey is not null
                 if (trailerKey != null) {
                     Dialog(
@@ -342,40 +334,40 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
                             .clickable { movieViewModel.clearTrailerKey() } // Dismiss on click outside player
                             , contentAlignment = Alignment.BottomCenter // Center the video player
                         ) {
-                                val lifecycleOwner = LocalLifecycleOwner.current
-                                AndroidView(
-                                    factory = { context ->
-                                        YouTubePlayerView(context).apply {
-                                            enableAutomaticInitialization = false
-                                            lifecycleOwner.lifecycle.addObserver(this)
-                                            val options = IFramePlayerOptions.Builder().controls(0).rel(0).ivLoadPolicy(0).build()
-                                            initialize(object : AbstractYouTubePlayerListener() {
-                                                override fun onReady(youTubePlayer: YouTubePlayer) {
-                                                    trailerKey?.let { key ->
-                                                        youTubePlayer.loadVideo(key, 0f)
-                                                    }
+                            val lifecycleOwner = LocalLifecycleOwner.current
+                            AndroidView(
+                                factory = { context ->
+                                    YouTubePlayerView(context).apply {
+                                        enableAutomaticInitialization = false
+                                        lifecycleOwner.lifecycle.addObserver(this)
+                                        val options = IFramePlayerOptions.Builder().controls(0).rel(0).ivLoadPolicy(0).build()
+                                        initialize(object : AbstractYouTubePlayerListener() {
+                                            override fun onReady(youTubePlayer: YouTubePlayer) {
+                                                trailerKey?.let { key ->
+                                                    youTubePlayer.loadVideo(key, 0f)
                                                 }
+                                            }
 
-                                                override fun onStateChange(
-                                                    youTubePlayer: YouTubePlayer,
-                                                    state: com.pierfrancescosoffritti.androidyoutubeplayer.core.player.PlayerConstants.PlayerState
-                                                ) {
-                                                    if (state == com.pierfrancescosoffritti.androidyoutubeplayer.core.player.PlayerConstants.PlayerState.ENDED) {
-                                                        movieViewModel.clearTrailerKey()
-                                                    }
+                                            override fun onStateChange(
+                                                youTubePlayer: YouTubePlayer,
+                                                state: com.pierfrancescosoffritti.androidyoutubeplayer.core.player.PlayerConstants.PlayerState
+                                            ) {
+                                                if (state == com.pierfrancescosoffritti.androidyoutubeplayer.core.player.PlayerConstants.PlayerState.ENDED) {
+                                                    movieViewModel.clearTrailerKey()
                                                 }
-                                            }, options)
-                                        }
-                                    },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .wrapContentHeight()
-                                        .padding(bottom = 100.dp)
-                                )
-                            }
+                                            }
+                                        }, options)
+                                    }
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .wrapContentHeight()
+                                    .padding(bottom = 100.dp)
+                            )
                         }
                     }
                 }
             }
         }
+    }
 }
