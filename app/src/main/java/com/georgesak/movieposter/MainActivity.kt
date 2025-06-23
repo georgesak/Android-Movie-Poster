@@ -47,6 +47,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -137,88 +138,110 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
     val scope = rememberCoroutineScope()
     val dragOffset = remember { Animatable(0f) }
     var isAnimatingSwipe by remember { mutableStateOf(false) }
+    val autoTransitionOffset = remember { Animatable(0f) }
 
-    LaunchedEffect(trailerKey) {
-        isPaused = trailerKey != null
-    }
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val fullWidth = with(LocalDensity.current) { maxWidth.toPx() }
 
-    LaunchedEffect(movies, transitionDelay, isPaused, swipeTrigger, selectedGenreIds.value, isAnimatingSwipe) {
-        val currentSavedGenreIds = sharedPreferences.getStringSet("selected_genre_ids", emptySet())?.mapNotNull { it.toIntOrNull() }?.toSet() ?: emptySet()
-        if (movies.isEmpty() || selectedGenreIds.value != currentSavedGenreIds) {
-            selectedGenreIds.value = currentSavedGenreIds
-            movieViewModel.getPopularMovies(selectedGenreIds.value)
+        LaunchedEffect(trailerKey) {
+            isPaused = trailerKey != null
         }
-        if (movies.isNotEmpty()) {
-            while (true) {
-                if (!isPaused && !isAnimatingSwipe) {
-                    delay(transitionDelay) // Use delay directly
-                    currentMovieIndex = (currentMovieIndex + 1) % movies.size
-                } else {
-                    delay(100)
+
+        // Moved LaunchedEffect inside BoxWithConstraints to access fullWidth
+        LaunchedEffect(movies, transitionDelay, isPaused, swipeTrigger, selectedGenreIds.value, isAnimatingSwipe, fullWidth) {
+            val currentSavedGenreIds = sharedPreferences.getStringSet("selected_genre_ids", emptySet())?.mapNotNull { it.toIntOrNull() }?.toSet() ?: emptySet()
+            if (movies.isEmpty() || selectedGenreIds.value != currentSavedGenreIds) {
+                selectedGenreIds.value = currentSavedGenreIds
+                movieViewModel.getPopularMovies(selectedGenreIds.value)
+            }
+            if (movies.isNotEmpty() && fullWidth > 0f) { // Ensure fullWidth is available
+                while (true) {
+                    if (!isPaused && !isAnimatingSwipe) {
+                        delay(transitionDelay) // Use delay directly
+                        val initialOffset = autoTransitionOffset.value
+                        val targetOffset = -fullWidth // Use fullWidth here
+                        autoTransitionOffset.animateTo(targetOffset, animationSpec = tween(durationMillis = 2000)) // Animate over 2 seconds
+                        currentMovieIndex = (currentMovieIndex + 1) % movies.size
+                        autoTransitionOffset.snapTo(0f) // Reset for new transition
+                    } else {
+                        delay(100)
+                    }
                 }
             }
         }
-    }
 
-    Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .padding(innerPadding)
-                .fillMaxSize()
-                .background(Color.Black) // Set background color to black
-                .clickable { isPaused = !isPaused } // Toggle pause state on click
-                .pointerInput(Unit) { // Add pointerInput for gesture detection
-                    detectHorizontalDragGestures(
-                        onHorizontalDrag = { change, dragAmountChange ->
-                            scope.launch {
-                                // Pause auto-advance during drag
-                                isPaused = true
-                                dragOffset.snapTo(dragOffset.value + dragAmountChange)
-                            }
-                            change.consume()
-                        },
-                        onDragEnd = {
-                            val swipeThreshold = size.width * 0.43f
-                            scope.launch {
-                                isAnimatingSwipe = true // Indicate that a swipe animation is starting
-                                val targetOffset = when {
-                                    dragOffset.value < -swipeThreshold -> -size.width.toFloat()
-                                    dragOffset.value > swipeThreshold -> size.width.toFloat()
-                                    else -> 0f
+        Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+            Box(
+                modifier = Modifier
+                    .padding(innerPadding)
+                    .fillMaxSize()
+                    .background(Color.Black) // Set background color to black
+                    .clickable { isPaused = !isPaused } // Toggle pause state on click
+                    .pointerInput(Unit) { // Add pointerInput for gesture detection
+                        detectHorizontalDragGestures(
+                            onHorizontalDrag = { change, dragAmountChange ->
+                                scope.launch {
+                                    // Pause auto-advance during drag
+                                    isPaused = true
+                                    dragOffset.snapTo(dragOffset.value + dragAmountChange)
                                 }
-
-                                dragOffset.animateTo(targetOffset, animationSpec = tween(durationMillis = 300))
-
-                                if (targetOffset != 0f) {
-                                    currentMovieIndex = if (targetOffset < 0) { // Swiped left
-                                        (currentMovieIndex + 1) % movies.size
-                                    } else { // Swiped right
-                                        (currentMovieIndex - 1 + movies.size) % movies.size
+                                change.consume()
+                            },
+                            onDragEnd = {
+                                val swipeThreshold = size.width * 0.43f
+                                scope.launch {
+                                    isAnimatingSwipe = true // Indicate that a swipe animation is starting
+                                    val targetOffset = when {
+                                        dragOffset.value < -swipeThreshold -> -size.width.toFloat()
+                                        dragOffset.value > swipeThreshold -> size.width.toFloat()
+                                        else -> 0f
                                     }
-                                }
-                                dragOffset.snapTo(0f) // Reset dragOffset to 0 for the new current movie
-                                isPaused = false // Unpause after swipe animation
-                                swipeTrigger = (swipeTrigger + 1) % 2 // Trigger LaunchedEffect
-                                isAnimatingSwipe = false // Indicate that swipe animation has ended
-                            }
-                        },
-                        onDragCancel = {
-                            scope.launch {
-                                dragOffset.animateTo(0f, animationSpec = tween(durationMillis = 300))
-                                isPaused = false // Unpause on cancel
-                                isAnimatingSwipe = false // Reset animation state
-                            }
-                        }
-                    )
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            if (movies.isEmpty()) {
-                CircularProgressIndicator()
-            } else {
-                BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                    val fullWidth = constraints.maxWidth.toFloat()
 
+                                    dragOffset.animateTo(targetOffset, animationSpec = tween(durationMillis = 300))
+
+                                    if (targetOffset != 0f) {
+                                        currentMovieIndex = if (targetOffset < 0) { // Swiped left
+                                            (currentMovieIndex + 1) % movies.size
+                                        } else { // Swiped right
+                                            (currentMovieIndex - 1 + movies.size) % movies.size
+                                        }
+                                    }
+                                    dragOffset.snapTo(0f) // Reset dragOffset to 0 for the new current movie
+                                    isPaused = false // Unpause after swipe animation
+                                    swipeTrigger = (swipeTrigger + 1) % 2 // Trigger LaunchedEffect
+                                    isAnimatingSwipe = false // Indicate that swipe animation has ended
+                                }
+                            },
+                            onDragCancel = {
+                                scope.launch {
+                                    dragOffset.animateTo(0f, animationSpec = tween(durationMillis = 300))
+                                    isPaused = false // Unpause on cancel
+                                    isAnimatingSwipe = false // Reset animation state
+                                }
+                            }
+                        )
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                if (movies.isEmpty()) {
+                    CircularProgressIndicator()
+                    IconButton(
+                        onClick = {
+                            val settingsIntent = Intent(context, SettingsActivity::class.java)
+                            context.startActivity(settingsIntent)
+                        },
+                        modifier = Modifier
+                            .alpha(0.25f)
+                            .align(Alignment.BottomEnd)
+                            .padding(bottom = 20.dp, end = 20.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Open Settings",
+                            tint = Color.White
+                        )
+                    }
+                } else {
                     val currentMovie = movies[currentMovieIndex]
                     val nextMovie = movies[(currentMovieIndex + 1) % movies.size]
                     val previousMovie = movies[(currentMovieIndex - 1 + movies.size) % movies.size]
@@ -249,26 +272,24 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
                         contentDescription = currentMovie.title,
                         modifier = Modifier
                             .fillMaxSize()
-                            .graphicsLayer { translationX = dragOffset.value },
+                            .graphicsLayer { translationX = dragOffset.value + autoTransitionOffset.value },
                         contentScale = ContentScale.Fit
                     )
 
-                    // Render next movie (appears from right when dragging left)
-                    if (dragOffset.value < 0f) {
-                        AsyncImage(
-                            model = ImageRequest.Builder(LocalContext.current)
-                                .data("https://image.tmdb.org/t/p/w500${nextMovie.posterPath}")
-                                .crossfade(1000) // Slow down fade effect to 1 second
-                                .build(),
-                            contentDescription = nextMovie.title,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .graphicsLayer {
-                                    translationX = fullWidth + dragOffset.value
-                                },
-                            contentScale = ContentScale.Fit
-                        )
-                    }
+                    // Render next movie (appears from right when dragging left or delay is over)
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data("https://image.tmdb.org/t/p/w500${nextMovie.posterPath}")
+                            .crossfade(1000) // Slow down fade effect to 1 second
+                            .build(),
+                        contentDescription = nextMovie.title,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                translationX = fullWidth + dragOffset.value + autoTransitionOffset.value
+                            },
+                        contentScale = ContentScale.Fit
+                    )
                 }
 
 
