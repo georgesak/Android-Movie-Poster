@@ -9,3 +9,7 @@ This application uses The Movie Database (TMDB) API to fetch movie data. You wil
 1. Go to [TMDB website](https://www.themoviedb.org/documentation/api) and sign up for an account.
 2. Generate an API key from your account settings.
 3. Add your API key to the project in the settings.
+
+## Demo
+
+[![Watch the Demo Video on YouTube](/media/thumbnail.png)](https://www.youtube.com/watch?v=C_3P9EXrm1U)
