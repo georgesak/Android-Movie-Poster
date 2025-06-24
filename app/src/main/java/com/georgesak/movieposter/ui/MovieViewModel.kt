@@ -71,8 +71,10 @@ class MovieViewModel(application: Application) : AndroidViewModel(application) {
         val sharedPreferences = getApplication<Application>().getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
         val ipAddress = sharedPreferences.getString("kodi_ip_address", "")
         val port = sharedPreferences.getInt("kodi_port", 8080)
+        val username = sharedPreferences.getString("kodi_username", "") ?: ""
+        val password = sharedPreferences.getString("kodi_password", "") ?: ""
         return if (!ipAddress.isNullOrEmpty()) {
-            KodiApiClient.createKodiApiService(ipAddress, port)
+            KodiApiClient.createKodiApiService(ipAddress, port, username, password)
         } else {
             null
         }
@@ -231,7 +233,6 @@ class MovieViewModel(application: Application) : AndroidViewModel(application) {
                         if (releaseDatesResponse.isSuccessful) {
                             val usRelease = releaseDatesResponse.body()?.results?.find { it.iso31661 == "US" }
                             val mpaaRating = usRelease?.release_dates?.firstOrNull { it.certification?.isNotEmpty() == true }?.certification
-
                             _currentMovieWithDetails.value = movieDetail?.copy(mpaaRating = mpaaRating)
                         } else {
                             Log.e(TAG, "Error fetching movie release dates: ${releaseDatesResponse.code()} - ${releaseDatesResponse.errorBody()?.string()}")

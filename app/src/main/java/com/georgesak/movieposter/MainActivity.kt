@@ -295,17 +295,44 @@ fun MoviePosterScreen(
                                 url // Return original URL on error
                             }
                         }
-
+                        // 2. Encode the credentials for Basic Auth
+                        val username = sharedPreferences.getString("kodi_username", "") ?: ""
+                        val password = sharedPreferences.getString("kodi_password", "") ?: ""
+                        var authorizationHeader = ""
+                        if (username != "" && password != "") {
+                            val credentials = "$username:$password"
+                            val encodedCredentials = android.util.Base64.encodeToString(credentials.toByteArray(), android.util.Base64.NO_WRAP)
+                            authorizationHeader = "Basic $encodedCredentials"
+                        }
                         Log.d("MainActivity", "decodedAndReplacedUrl: ${decodedAndReplacedUrl}")
-                        AsyncImage(
-                            model = ImageRequest.Builder(LocalContext.current)
-                                .data(decodedAndReplacedUrl)
-                                .crossfade(1000)
-                                .build(),
-                            contentDescription = kodiMovie.title,
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Fit
-                        )
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            AsyncImage(
+                                model = ImageRequest.Builder(LocalContext.current)
+                                    .data(decodedAndReplacedUrl)
+                                    .addHeader("Authorization", authorizationHeader) // Add the Authorization header
+                                    .crossfade(1000)
+                                    .build(),
+                                contentDescription = kodiMovie.title,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Fit
+                            )
+
+                            // "Now Playing" banner at the top
+                            Column(
+                                modifier = Modifier
+                                    .align(Alignment.TopCenter)
+                                    .fillMaxWidth()
+                                    .background(Color.Black.copy(alpha = 0.7f)) // Semi-transparent black background
+                                    .padding(vertical = 20.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = "Now Playing: " + kodiMovie.title ?: kodiMovie.label,
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    color = Color.Gray
+                                )
+                            }
+                        }
                     } ?: run {
                         // Original slideshow logic
 
@@ -354,32 +381,26 @@ fun MoviePosterScreen(
                         contentScale = ContentScale.Fit
                     )
 
+                    movieViewModel.getMovieDetails(movies[currentMovieIndex].id) // Fetch details for the new movie
+
                     Column(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .padding(bottom = 40.dp), // Adjust padding for the whole column
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        // Display Kodi movie title if playing
-                        kodiPlayingMovie?.let { kodiMovie ->
-                            Text(
-                                text = kodiMovie.title ?: "", // Provide a default empty string if title is null
-                                style = MaterialTheme.typography.headlineLarge,
-                                color = Color.White,
-                                modifier = Modifier.padding(bottom = 8.dp)
-                            )
-                        } ?: run {
-                            // Original movie details display
-                            // Movie MPAA rating
-                            if (showMpaaRating.value) {
-                                currentMovieWithDetails?.mpaaRating?.let { mpaaRating ->
-                                    Text(
-                                        text = "MPAA Rating: $mpaaRating",
-                                        color = Grey,
-                                        modifier = Modifier.padding(vertical = 2.dp)
-                                    )
-                                }
+                        // Original movie details display
+                        // Movie MPAA rating
+                        if (showMpaaRating.value) {
+                            //Log.d("MainActivity", "Showing MPAA" + currentMovieWithDetails?.mpaaRating)
+                            currentMovieWithDetails?.mpaaRating?.let { mpaaRating ->
+                                Text(
+                                    text = "MPAA Rating: $mpaaRating",
+                                    color = Grey,
+                                    modifier = Modifier.padding(vertical = 2.dp)
+                                )
                             }
+                        }
 
                         // Movie release date
                         if (showReleaseDate.value) {
@@ -417,22 +438,24 @@ fun MoviePosterScreen(
                 } // End of kodiPlayingMovie?.let block
 
                 // Button to show trailer
-                IconButton(
-                    onClick = {
-                        if (movies.isNotEmpty()) {
-                            movieViewModel.getMovieTrailer(movies[currentMovieIndex].id)
-                        }
-                    },
-                    modifier = Modifier
-                        .alpha(0.25f)
-                        .align(Alignment.BottomStart)
-                        .padding(bottom = 20.dp, start = 20.dp) // Add some padding from the bottom and right
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Movie,
-                        contentDescription = "Play Trailer",
-                        tint = Color.White // Set icon color to white for visibility
-                    )
+                if (kodiPlayingMovie == null) { // Only show trailer button if Kodi is not playing a movie
+                    IconButton(
+                        onClick = {
+                            if (movies.isNotEmpty()) {
+                                movieViewModel.getMovieTrailer(movies[currentMovieIndex].id)
+                            }
+                        },
+                        modifier = Modifier
+                            .alpha(0.25f)
+                            .align(Alignment.BottomStart)
+                            .padding(bottom = 20.dp, start = 20.dp) // Add some padding from the bottom and right
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Movie,
+                            contentDescription = "Play Trailer",
+                            tint = Color.White // Set icon color to white for visibility
+                        )
+                    }
                 }
 
 
@@ -455,7 +478,7 @@ fun MoviePosterScreen(
                 }
 
                 // Paused indicator
-                if (isPaused) {
+                if (isPaused && kodiPlayingMovie == null) {
                     Icon(
                         imageVector = Icons.Default.Pause,
                         contentDescription = "Paused",
@@ -519,6 +542,5 @@ fun MoviePosterScreen(
                 }
             }
         }
-    }
     }
 }

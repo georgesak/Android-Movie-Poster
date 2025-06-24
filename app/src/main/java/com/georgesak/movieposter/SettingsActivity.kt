@@ -105,6 +105,14 @@ fun SettingsScreen(movieViewModel: MovieViewModel = viewModel()) {
         mutableStateOf(sharedPreferences.getLong("kodi_polling_interval", 5000L)) // Default 5 seconds
     }
 
+    val (kodiUsername, setKodiUsername) = remember {
+        mutableStateOf(sharedPreferences.getString("kodi_username", "") ?: "")
+    }
+
+    val (kodiPassword, setKodiPassword) = remember {
+        mutableStateOf(sharedPreferences.getString("kodi_password", "") ?: "")
+    }
+
     fun saveSettings(
         sharedPreferences: SharedPreferences,
         transitionDelay: Long,
@@ -118,6 +126,8 @@ fun SettingsScreen(movieViewModel: MovieViewModel = viewModel()) {
         kodiIpAddress: String,
         kodiPort: Int,
         kodiPollingInterval: Long,
+        kodiUsername: String,
+        kodiPassword: String,
         movieViewModel: MovieViewModel,
         context: Context
     ) {
@@ -133,6 +143,8 @@ fun SettingsScreen(movieViewModel: MovieViewModel = viewModel()) {
             putString("kodi_ip_address", kodiIpAddress)
             putInt("kodi_port", kodiPort)
             putLong("kodi_polling_interval", kodiPollingInterval)
+            putString("kodi_username", kodiUsername)
+            putString("kodi_password", kodiPassword)
             apply()
         }
         movieViewModel.getPopularMovies(selectedGenreIds)
@@ -177,6 +189,8 @@ fun SettingsScreen(movieViewModel: MovieViewModel = viewModel()) {
                                 kodiIpAddress,
                                 kodiPort,
                                 kodiPollingInterval,
+                                kodiUsername,
+                                kodiPassword,
                                 movieViewModel,
                                 context
                             )
@@ -421,6 +435,25 @@ fun SettingsScreen(movieViewModel: MovieViewModel = viewModel()) {
                     },
                     label = { Text("Interval") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.padding(top = 8.dp))
+                Text("Kodi Username", style = MaterialTheme.typography.titleMedium)
+                OutlinedTextField(
+                    value = kodiUsername,
+                    onValueChange = { setKodiUsername(it) },
+                    label = { Text("Username") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.padding(top = 8.dp))
+                Text("Kodi Password", style = MaterialTheme.typography.titleMedium)
+                OutlinedTextField(
+                    value = kodiPassword,
+                    onValueChange = { setKodiPassword(it) },
+                    label = { Text("Password") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     modifier = Modifier.fillMaxWidth()
                 )
             }
