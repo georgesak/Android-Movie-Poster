@@ -133,6 +133,9 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
     val selectedGenreIds = remember {
         mutableStateOf(sharedPreferences.getStringSet("selected_genre_ids", emptySet())?.mapNotNull { it.toIntOrNull() }?.toSet() ?: emptySet())
     }
+    val trailerPlacement = remember {
+        mutableStateOf(sharedPreferences.getString("trailer_placement", "Bottom") ?: "Bottom")
+    }
     val trailerKey by movieViewModel.trailerKey.collectAsState()
     var swipeTrigger by remember { mutableStateOf(0) }
     val scope = rememberCoroutineScope()
@@ -353,7 +356,12 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
                             .fillMaxSize()
                             .background(Color.Black.copy(alpha = 0.8f)) // Semi-transparent black background
                             .clickable { movieViewModel.clearTrailerKey() } // Dismiss on click outside player
-                            , contentAlignment = Alignment.BottomCenter // Center the video player
+                            , contentAlignment = when (trailerPlacement.value) {
+                                "Top" -> Alignment.TopCenter
+                                "Middle" -> Alignment.Center
+                                "Bottom" -> Alignment.BottomCenter
+                                else -> Alignment.BottomCenter
+                            }
                         ) {
                             val lifecycleOwner = LocalLifecycleOwner.current
                             AndroidView(

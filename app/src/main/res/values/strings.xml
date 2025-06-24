@@ -1,4 +1,7 @@
 <resources>
     <string name="app_name">MoviePoster</string>
-    <string name="settings_activity_label">Settings</string> // Added settings activity label
+    <string name="settings_activity_label">Settings</string>
+    <string name="trailer_placement_top">Top</string>
+    <string name="trailer_placement_middle">Middle</string>
+    <string name="trailer_placement_bottom">Bottom</string>
 </resources>

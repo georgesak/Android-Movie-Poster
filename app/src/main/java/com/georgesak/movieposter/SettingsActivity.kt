@@ -36,6 +36,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.RadioButton
 import androidx.compose.foundation.layout.Row
 import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.rememberScrollState
@@ -72,11 +73,16 @@ fun SettingsScreen(movieViewModel: MovieViewModel = viewModel()) {
         mutableStateOf(savedGenreIds)
     }
 
+    val (trailerPlacement, setTrailerPlacement) = remember {
+        mutableStateOf(sharedPreferences.getString("trailer_placement", "Bottom") ?: "Bottom")
+    }
+
 fun saveSettings(
         sharedPreferences: SharedPreferences,
         transitionDelay: Long,
         apiKey: String,
         selectedGenreIds: Set<Int>,
+        trailerPlacement: String,
         movieViewModel: MovieViewModel,
         context: Context
     ) {
@@ -84,6 +90,7 @@ fun saveSettings(
             putLong("transition_delay", transitionDelay)
             putString("api_key", apiKey)
             putStringSet("selected_genre_ids", selectedGenreIds.map { it.toString() }.toSet())
+            putString("trailer_placement", trailerPlacement)
             apply()
         }
         movieViewModel.getPopularMovies(selectedGenreIds)
@@ -120,6 +127,7 @@ fun saveSettings(
                                 transitionDelay,
                                 apiKey,
                                 selectedGenreIds,
+                                trailerPlacement,
                                 movieViewModel,
                                 context
                             )
@@ -219,6 +227,33 @@ fun saveSettings(
                             onCheckedChange = null // null recommended for accessibility with toggleable
                         )
                         Text(genre.name)
+                    }
+                }
+            }
+
+            Text("Trailer Placement")
+            val placementOptions = listOf("Top", "Middle", "Bottom")
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.Start
+            ) {
+                placementOptions.forEach { option ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .toggleable(
+                                value = trailerPlacement == option,
+                                onValueChange = { setTrailerPlacement(option) },
+                                role = Role.RadioButton
+                            )
+                            .padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        androidx.compose.material3.RadioButton(
+                            selected = trailerPlacement == option,
+                            onClick = null // null recommended for accessibility with toggleable
+                        )
+                        Text(option)
                     }
                 }
             }
