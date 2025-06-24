@@ -14,9 +14,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -77,12 +81,30 @@ fun SettingsScreen(movieViewModel: MovieViewModel = viewModel()) {
         mutableStateOf(sharedPreferences.getString("trailer_placement", "Bottom") ?: "Bottom")
     }
 
+    val (originalLanguage, setOriginalLanguage) = remember {
+        mutableStateOf(sharedPreferences.getString("original_language", "en") ?: "en")
+    }
+
+    val (showRuntime, setShowRuntime) = remember {
+        mutableStateOf(sharedPreferences.getBoolean("show_runtime", true))
+    }
+    val (showReleaseDate, setShowReleaseDate) = remember {
+        mutableStateOf(sharedPreferences.getBoolean("show_release_date", true))
+    }
+    val (showMpaaRating, setShowMpaaRating) = remember {
+        mutableStateOf(sharedPreferences.getBoolean("show_mpaa_rating", true))
+    }
+
 fun saveSettings(
         sharedPreferences: SharedPreferences,
         transitionDelay: Long,
         apiKey: String,
         selectedGenreIds: Set<Int>,
         trailerPlacement: String,
+        originalLanguage: String,
+        showRuntime: Boolean,
+        showReleaseDate: Boolean,
+        showMpaaRating: Boolean,
         movieViewModel: MovieViewModel,
         context: Context
     ) {
@@ -91,6 +113,10 @@ fun saveSettings(
             putString("api_key", apiKey)
             putStringSet("selected_genre_ids", selectedGenreIds.map { it.toString() }.toSet())
             putString("trailer_placement", trailerPlacement)
+            putString("original_language", originalLanguage)
+            putBoolean("show_runtime", showRuntime)
+            putBoolean("show_release_date", showReleaseDate)
+            putBoolean("show_mpaa_rating", showMpaaRating)
             apply()
         }
         movieViewModel.getPopularMovies(selectedGenreIds)
@@ -128,6 +154,10 @@ fun saveSettings(
                                 apiKey,
                                 selectedGenreIds,
                                 trailerPlacement,
+                                originalLanguage,
+                                showRuntime,
+                                showReleaseDate,
+                                showMpaaRating,
                                 movieViewModel,
                                 context
                             )
@@ -144,78 +174,71 @@ fun saveSettings(
         Column(
             modifier = Modifier
                 .padding(paddingValues)
-                .padding(horizontal = 16.dp)
                 .fillMaxSize()
                 .verticalScroll(scrollState),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Spacer(modifier = Modifier.padding(top = 16.dp))
-            Text("Transition Delay (10 to 600 seconds)")
-            OutlinedTextField(
-                value = (transitionDelay / 1000L).toString(),
-                onValueChange = { newValue ->
-                    val seconds = newValue.toLongOrNull()
-                    val validSeconds = when {
-                        seconds == null -> 10L
-                        seconds < 10L -> 10L
-                        seconds > 600L -> 600L
-                        else -> seconds
-                    }
-                    val milliseconds = validSeconds * 1000L
-                    setTransitionDelay(milliseconds)
-                },
-                label = { Text("Delay") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-            )
 
-            Text("MovieDB API Key")
-            OutlinedTextField(
-                value = apiKey,
-                onValueChange = { newValue ->
-                    setApiKey(newValue)
-                },
-                label = { Text("API Key") }
-            )
+            // General Settings Section
+            SettingsSection(title = "General Settings") {
+                Text("Transition Delay (10 to 600 seconds)", style = MaterialTheme.typography.titleMedium)
+                OutlinedTextField(
+                    value = (transitionDelay / 1000L).toString(),
+                    onValueChange = { newValue ->
+                        val seconds = newValue.toLongOrNull()
+                        val validSeconds = when {
+                            seconds == null -> 10L
+                            seconds < 10L -> 10L
+                            seconds > 600L -> 600L
+                            else -> seconds
+                        }
+                        val milliseconds = validSeconds * 1000L
+                        setTransitionDelay(milliseconds)
+                    },
+                    label = { Text("Delay") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
 
-            Text("Movie Genre(s)")
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .toggleable(
-                            value = selectedGenreIds.isEmpty() || selectedGenreIds.contains(0),
-                            onValueChange = {
-                                setSelectedGenreIds(setOf(0))
-                            },
-                            role = Role.Checkbox
-                        )
-                        .padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Spacer(modifier = Modifier.padding(top = 8.dp))
+                Text("MovieDB API Key", style = MaterialTheme.typography.titleMedium)
+                OutlinedTextField(
+                    value = apiKey,
+                    onValueChange = { newValue ->
+                        setApiKey(newValue)
+                    },
+                    label = { Text("API Key") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.padding(top = 8.dp))
+                Text("Original Language (e.g., en|fr|es)", style = MaterialTheme.typography.titleMedium)
+                OutlinedTextField(
+                    value = originalLanguage,
+                    onValueChange = { newValue ->
+                        setOriginalLanguage(newValue)
+                    },
+                    label = { Text("Language Code") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            // Genre Selection Section
+            SettingsSection(title = "Movie Genre(s)") {
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Checkbox(
-                        checked = selectedGenreIds.isEmpty() || selectedGenreIds.contains(0),
-                            onCheckedChange = null // null recommended for accessibility with toggleable
-                    )
-                    Text("All")
-                }
-                genres.forEach { genre ->
                     Row(
                         Modifier
                             .fillMaxWidth()
                             .toggleable(
-                                value = selectedGenreIds.contains(genre.id),
+                                value = selectedGenreIds.isEmpty() || selectedGenreIds.contains(0),
                                 onValueChange = {
-                                    val newSelection = if (selectedGenreIds.contains(genre.id)) {
-                                        selectedGenreIds - genre.id
-                                    } else {
-                                        selectedGenreIds + genre.id
-                                    }
-                                    setSelectedGenreIds(newSelection.filter { it != 0 }.toSet())
+                                    setSelectedGenreIds(setOf(0))
                                 },
                                 role = Role.Checkbox
                             )
@@ -223,42 +246,146 @@ fun saveSettings(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Checkbox(
-                            checked = selectedGenreIds.contains(genre.id),
+                            checked = selectedGenreIds.isEmpty() || selectedGenreIds.contains(0),
                             onCheckedChange = null // null recommended for accessibility with toggleable
                         )
-                        Text(genre.name)
+                        Text("All")
+                    }
+                    genres.forEach { genre ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .toggleable(
+                                    value = selectedGenreIds.contains(genre.id),
+                                    onValueChange = {
+                                        val newSelection = if (selectedGenreIds.contains(genre.id)) {
+                                            selectedGenreIds - genre.id
+                                        } else {
+                                            selectedGenreIds + genre.id
+                                        }
+                                        setSelectedGenreIds(newSelection.filter { it != 0 }.toSet())
+                                    },
+                                    role = Role.Checkbox
+                                )
+                                .padding(horizontal = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Checkbox(
+                                checked = selectedGenreIds.contains(genre.id),
+                                onCheckedChange = null // null recommended for accessibility with toggleable
+                            )
+                            Text(genre.name)
+                        }
                     }
                 }
             }
 
-            Text("Trailer Placement")
-            val placementOptions = listOf("Top", "Middle", "Bottom")
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.Start
-            ) {
-                placementOptions.forEach { option ->
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .toggleable(
-                                value = trailerPlacement == option,
-                                onValueChange = { setTrailerPlacement(option) },
-                                role = Role.RadioButton
+            // Trailer Placement Section
+            SettingsSection(title = "Trailer Placement") {
+                val placementOptions = listOf("Top", "Middle", "Bottom")
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.Start
+                ) {
+                    placementOptions.forEach { option ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .toggleable(
+                                    value = trailerPlacement == option,
+                                    onValueChange = { setTrailerPlacement(option) },
+                                    role = Role.RadioButton
+                                )
+                                .padding(horizontal = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            androidx.compose.material3.RadioButton(
+                                selected = trailerPlacement == option,
+                                onClick = null // null recommended for accessibility with toggleable
                             )
-                            .padding(horizontal = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        androidx.compose.material3.RadioButton(
-                            selected = trailerPlacement == option,
-                            onClick = null // null recommended for accessibility with toggleable
-                        )
-                        Text(option)
+                            Text(option)
+                        }
                     }
+                }
+            }
+
+            // Poster Information Display Settings
+            SettingsSection(title = "Poster Information Display") {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .toggleable(
+                            value = showRuntime,
+                            onValueChange = { setShowRuntime(it) },
+                            role = Role.Checkbox
+                        )
+                        .padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = showRuntime,
+                        onCheckedChange = null
+                    )
+                    Text("Show Runtime")
+                }
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .toggleable(
+                            value = showReleaseDate,
+                            onValueChange = { setShowReleaseDate(it) },
+                            role = Role.Checkbox
+                        )
+                        .padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = showReleaseDate,
+                        onCheckedChange = null
+                    )
+                    Text("Show Release Date")
+                }
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .toggleable(
+                            value = showMpaaRating,
+                            onValueChange = { setShowMpaaRating(it) },
+                            role = Role.Checkbox
+                        )
+                        .padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = showMpaaRating,
+                        onCheckedChange = null
+                    )
+                    Text("Show MPAA Rating")
                 }
             }
 
             Spacer(modifier = Modifier.weight(1f)) // Push content to top if needed
+        }
+    }
+}
+
+@Composable
+fun SettingsSection(title: String, content: @Composable () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            Divider(modifier = Modifier.padding(vertical = 8.dp))
+            content()
         }
     }
 }

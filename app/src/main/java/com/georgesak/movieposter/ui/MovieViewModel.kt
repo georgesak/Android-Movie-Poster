@@ -9,6 +9,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.georgesak.movieposter.data.Genre
 import com.georgesak.movieposter.data.Movie
+import com.georgesak.movieposter.data.ReleaseDateResponse // Import ReleaseDateResponse
 import com.georgesak.movieposter.network.ApiService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,6 +21,9 @@ class MovieViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _movies = mutableStateOf<List<Movie>>(emptyList())
     val movies: State<List<Movie>> = _movies
+
+    private val _currentMovieWithDetails = MutableStateFlow<Movie?>(null)
+    val currentMovieWithDetails: StateFlow<Movie?> = _currentMovieWithDetails
 
     private val _genres = mutableStateOf<List<Genre>>(emptyList())
     val genres: State<List<Genre>> = _genres
@@ -49,15 +53,22 @@ class MovieViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 val apiKey = getApiKey()
+                val sharedPreferences = getApplication<Application>().getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
+                val originalLanguage = sharedPreferences.getString("original_language", "en") ?: "en"
+
                 if (apiKey.isNotEmpty()) {
                     val response = if (genreIds != null && genreIds.isNotEmpty() && !genreIds.contains(0)) {
-                        apiService.getMoviesByGenres(apiKey, genreIds.joinToString("|"))
+                        apiService.getMoviesByGenres(apiKey, genreIds.joinToString("|"), originalLanguage)
                     } else {
-                        apiService.getMoviesByGenres(apiKey, "")
+                        apiService.getMoviesByGenres(apiKey, "", originalLanguage)
                     }
 
                     if (response.isSuccessful) {
                         _movies.value = response.body()?.results ?: emptyList()
+                        // Fetch details for the first movie if available
+                        _movies.value.firstOrNull()?.let { movie ->
+                            getMovieDetails(movie.id)
+                        }
                     } else {
                         println("Error fetching movies: ${response.errorBody()}")
                     }
@@ -66,6 +77,41 @@ class MovieViewModel(application: Application) : AndroidViewModel(application) {
                 }
             } catch (e: Exception) {
                 println("Exception fetching movies: ${e.message}")
+            }
+        }
+    }
+
+    fun getMovieDetails(movieId: Int) {
+        viewModelScope.launch {
+            try {
+                val apiKey = getApiKey()
+                if (apiKey.isNotEmpty()) {
+                    val movieDetailsResponse = apiService.getMovieDetails(movieId, apiKey)
+                    if (movieDetailsResponse.isSuccessful) {
+                        val movie = movieDetailsResponse.body()
+
+                        // Fetch release dates for MPAA rating
+                        val releaseDatesResponse = apiService.getMovieReleaseDates(movieId, apiKey)
+                        if (releaseDatesResponse.isSuccessful) {
+                            val usRelease = releaseDatesResponse.body()?.results?.find { it.iso31661 == "US" }
+                            val mpaaRating = usRelease?.release_dates?.firstOrNull { it.certification?.isNotEmpty() == true }?.certification
+
+                            _currentMovieWithDetails.value = movie?.copy(mpaaRating = mpaaRating)
+                        } else {
+                            println("Error fetching movie release dates: ${releaseDatesResponse.errorBody()}")
+                            _currentMovieWithDetails.value = movie // Set movie details even if release dates fail
+                        }
+                    } else {
+                        println("Error fetching movie details: ${movieDetailsResponse.errorBody()}")
+                        _currentMovieWithDetails.value = null
+                    }
+                } else {
+                    println("API Key is not set.")
+                    _currentMovieWithDetails.value = null
+                }
+            } catch (e: Exception) {
+                println("Exception fetching movie details: ${e.message}")
+                _currentMovieWithDetails.value = null
             }
         }
     }

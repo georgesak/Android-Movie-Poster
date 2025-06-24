@@ -19,6 +19,7 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentHeight
@@ -31,6 +32,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -43,6 +45,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import com.georgesak.movieposter.ui.theme.Grey
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -125,6 +128,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = MovieViewModel.Factory)) { // Use the factory
     val movies = movieViewModel.movies.value
+    val currentMovieWithDetails by movieViewModel.currentMovieWithDetails.collectAsState(initial = null) // Observe movie details
     var currentMovieIndex by remember { mutableStateOf(0) }
     var isPaused by remember { mutableStateOf(false) } // State to track if slideshow is paused
     val context = LocalContext.current // Get the current context
@@ -135,6 +139,15 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
     }
     val trailerPlacement = remember {
         mutableStateOf(sharedPreferences.getString("trailer_placement", "Bottom") ?: "Bottom")
+    }
+    val showRuntime = remember {
+        mutableStateOf(sharedPreferences.getBoolean("show_runtime", true))
+    }
+    val showReleaseDate = remember {
+        mutableStateOf(sharedPreferences.getBoolean("show_release_date", true))
+    }
+    val showMpaaRating = remember {
+        mutableStateOf(sharedPreferences.getBoolean("show_mpaa_rating", true))
     }
     val trailerKey by movieViewModel.trailerKey.collectAsState()
     var swipeTrigger by remember { mutableStateOf(0) }
@@ -165,6 +178,7 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
                         val targetOffset = -fullWidth // Use fullWidth here
                         autoTransitionOffset.animateTo(targetOffset, animationSpec = tween(durationMillis = 2000)) // Animate over 2 seconds
                         currentMovieIndex = (currentMovieIndex + 1) % movies.size
+                        movieViewModel.getMovieDetails(movies[currentMovieIndex].id) // Fetch details for the new movie
                         autoTransitionOffset.snapTo(0f) // Reset for new transition
                     } else {
                         delay(100)
@@ -208,6 +222,7 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
                                         } else { // Swiped right
                                             (currentMovieIndex - 1 + movies.size) % movies.size
                                         }
+                                        movieViewModel.getMovieDetails(movies[currentMovieIndex].id) // Fetch details for the new movie
                                     }
                                     dragOffset.snapTo(0f) // Reset dragOffset to 0 for the new current movie
                                     isPaused = false // Unpause after swipe animation
@@ -293,6 +308,46 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
                             },
                         contentScale = ContentScale.Fit
                     )
+
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 40.dp), // Adjust padding for the whole column
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        // Movie MPAA rating
+                        if (showMpaaRating.value) {
+                            currentMovieWithDetails?.mpaaRating?.let { mpaaRating ->
+                                Text(
+                                    text = "MPAA Rating: $mpaaRating",
+                                    color = Grey,
+                                    modifier = Modifier.padding(vertical = 2.dp)
+                                )
+                            }
+                        }
+
+                        // Movie release date
+                        if (showReleaseDate.value) {
+                            currentMovieWithDetails?.releaseDate?.let { releaseDate ->
+                                Text(
+                                    text = "Release Date: $releaseDate",
+                                    color = Grey,
+                                    modifier = Modifier.padding(vertical = 2.dp)
+                                )
+                            }
+                        }
+
+                        // Movie runtime
+                        if (showRuntime.value) {
+                            currentMovieWithDetails?.runtime?.let { runtime ->
+                                Text(
+                                    text = "${runtime} minutes",
+                                    color = Grey,
+                                    modifier = Modifier.padding(vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
                 }
 
 
