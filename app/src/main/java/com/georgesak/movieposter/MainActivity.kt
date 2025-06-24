@@ -340,11 +340,21 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
                         // Movie runtime
                         if (showRuntime.value) {
                             currentMovieWithDetails?.runtime?.let { runtime ->
-                                Text(
-                                    text = "${runtime} minutes",
-                                    color = Grey,
-                                    modifier = Modifier.padding(vertical = 2.dp)
-                                )
+                                val hours = runtime / 60
+                                val minutes = runtime % 60
+                                val runtimeText = when {
+                                    hours > 0 && minutes > 0 -> "${hours}h ${minutes}m"
+                                    hours > 0 -> "${hours}h"
+                                    minutes > 0 -> "${minutes}m"
+                                    else -> ""
+                                }
+                                if (runtimeText.isNotEmpty()) {
+                                    Text(
+                                        text = runtimeText,
+                                        color = Grey,
+                                        modifier = Modifier.padding(vertical = 2.dp)
+                                    )
+                                }
                             }
                         }
                     }
