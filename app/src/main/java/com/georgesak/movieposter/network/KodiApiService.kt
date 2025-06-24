@@ -1,6 +1,7 @@
 package com.georgesak.movieposter.network
 
 import com.georgesak.movieposter.data.KodiActivePlayer
+import com.georgesak.movieposter.data.KodiItemResponse
 import com.georgesak.movieposter.data.KodiPlayerProperties
 import com.georgesak.movieposter.data.KodiRpcRequest
 import com.georgesak.movieposter.data.KodiRpcResponse
@@ -14,4 +15,7 @@ interface KodiApiService {
 
     @POST("jsonrpc")
     suspend fun getPlayerProperties(@Body request: KodiRpcRequest): Response<KodiRpcResponse<KodiPlayerProperties>>
+
+    @POST("jsonrpc")
+    suspend fun getPlayerItem(@Body request: KodiRpcRequest): Response<KodiRpcResponse<KodiItemResponse>>
 }

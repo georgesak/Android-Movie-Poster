@@ -1,16 +1,23 @@
 package com.georgesak.movieposter
 
 import android.app.Application
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.ViewModelStoreOwner
 import coil.Coil
 import coil.ImageLoader
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import coil.request.CachePolicy
 
-class MoviePosterApplication : Application() {
+class MoviePosterApplication : Application(), ViewModelStoreOwner {
+
+    private lateinit var appViewModelStore: ViewModelStore
 
     override fun onCreate() {
         super.onCreate()
+        appViewModelStore = ViewModelStore()
+
         Coil.setImageLoader(
             ImageLoader.Builder(this)
                 .memoryCache {
@@ -30,4 +37,7 @@ class MoviePosterApplication : Application() {
                 .build()
         )
     }
+
+    override val viewModelStore: ViewModelStore
+        get() = appViewModelStore
 }

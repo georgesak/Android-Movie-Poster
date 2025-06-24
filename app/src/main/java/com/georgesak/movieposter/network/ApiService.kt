@@ -32,7 +32,7 @@ interface ApiService {
     suspend fun getMovieDetails(
         @Path("movie_id") movieId: Int,
         @Query("api_key") apiKey: String
-    ): Response<com.georgesak.movieposter.data.Movie> // Return a single Movie object
+    ): Response<com.georgesak.movieposter.data.MovieDetail> // Return a single MovieDetail object
 
     @GET("movie/{movie_id}/release_dates") // Endpoint for movie release dates
     suspend fun getMovieReleaseDates(

@@ -1,5 +1,7 @@
 package com.georgesak.movieposter.data
 
+import com.georgesak.movieposter.data.Genre
+import com.georgesak.movieposter.data.VideoResponse
 import com.google.gson.annotations.SerializedName
 
 data class Movie(
@@ -18,24 +20,11 @@ data class MovieResponse(
     val results: List<Movie>
 )
 
-data class Genre(
-    val id: Int,
-    val name: String
-)
 
 data class GenreResponse(
     val genres: List<Genre>
 )
 
-data class Video(
-    val key: String, // YouTube video key
-    val site: String, // e.g., "YouTube"
-    val type: String // e.g., "Trailer"
-)
-
-data class VideoResponse(
-    val results: List<Video>
-)
 
 data class ReleaseDateResponse(
     val id: Int,

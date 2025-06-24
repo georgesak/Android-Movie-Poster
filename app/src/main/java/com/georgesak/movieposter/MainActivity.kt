@@ -16,6 +16,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import com.georgesak.movieposter.data.MovieDetail
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
@@ -31,6 +32,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -71,6 +73,7 @@ import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.options.IFram
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.views.YouTubePlayerView
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import android.util.Log
 
 @OptIn(ExperimentalMaterial3Api::class) // Add opt-in for ExperimentalMaterial3Api
 class MainActivity : ComponentActivity() {
@@ -126,9 +129,11 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = MovieViewModel.Factory)) { // Use the factory
+fun MoviePosterScreen(
+    movieViewModel: MovieViewModel = viewModel(factory = MovieViewModel.Factory)
+) { // Use the factory
     val movies = movieViewModel.movies.value
-    val currentMovieWithDetails by movieViewModel.currentMovieWithDetails.collectAsState(initial = null) // Observe movie details
+    val currentMovieWithDetails: MovieDetail? by movieViewModel.currentMovieWithDetails.collectAsState() // Observe movie details
     var currentMovieIndex by remember { mutableStateOf(0) }
     var isPaused by remember { mutableStateOf(false) } // State to track if slideshow is paused
     val context = LocalContext.current // Get the current context
@@ -156,11 +161,16 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
     var isAnimatingSwipe by remember { mutableStateOf(false) }
     val autoTransitionOffset = remember { Animatable(0f) }
 
+    val kodiPlayingMovie by movieViewModel.kodiPlayingMovie.collectAsState() // Observe Kodi playing movie
+
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val fullWidth = with(LocalDensity.current) { maxWidth.toPx() }
 
-        LaunchedEffect(trailerKey) {
-            isPaused = trailerKey != null
+        LaunchedEffect(trailerKey, kodiPlayingMovie) {
+            isPaused = trailerKey != null || kodiPlayingMovie != null
+            if (kodiPlayingMovie != null) {
+                Log.d("MainActivity", "Kodi movie playing: ${kodiPlayingMovie?.label}")
+            }
         }
 
         // Moved LaunchedEffect inside BoxWithConstraints to access fullWidth
@@ -264,6 +274,41 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
                     val nextMovie = movies[(currentMovieIndex + 1) % movies.size]
                     val previousMovie = movies[(currentMovieIndex - 1 + movies.size) % movies.size]
 
+                    Log.d("MainActivity", "Kodi poster: ${kodiPlayingMovie?.art?.poster}")
+                    // Display Kodi movie poster if a movie is playing on Kodi
+                    kodiPlayingMovie?.let { kodiMovie ->
+                        val kodiIpAddress = sharedPreferences.getString("kodi_ip_address", "") ?: ""
+                        val kodiPort = sharedPreferences.getInt("kodi_port", 8080)
+                        val kodiBaseUrl = if (kodiIpAddress.isNotEmpty()) "http://$kodiIpAddress:$kodiPort/image/" else ""
+
+                        val imageUrl = kodiMovie.art?.poster ?: kodiMovie.thumbnail
+                        val decodedAndReplacedUrl = imageUrl?.let { url ->
+                            try {
+                                val tempUrl = url
+                                if (tempUrl.startsWith("image://")) {
+                                    tempUrl.replace("image://", "")
+                                }
+                                val decodedUrl = kodiBaseUrl + java.net.URLEncoder.encode(tempUrl, "UTF-8")
+                                decodedUrl
+                            } catch (e: Exception) {
+                                Log.e("MainActivity", "Error decoding or replacing Kodi image URL: $url", e)
+                                url // Return original URL on error
+                            }
+                        }
+
+                        Log.d("MainActivity", "decodedAndReplacedUrl: ${decodedAndReplacedUrl}")
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(decodedAndReplacedUrl)
+                                .crossfade(1000)
+                                .build(),
+                            contentDescription = kodiMovie.title,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Fit
+                        )
+                    } ?: run {
+                        // Original slideshow logic
+
                     // Render previous movie (appears from left when dragging right)
                     if (dragOffset.value > 0f) {
                         AsyncImage(
@@ -315,16 +360,26 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
                             .padding(bottom = 40.dp), // Adjust padding for the whole column
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        // Movie MPAA rating
-                        if (showMpaaRating.value) {
-                            currentMovieWithDetails?.mpaaRating?.let { mpaaRating ->
-                                Text(
-                                    text = "MPAA Rating: $mpaaRating",
-                                    color = Grey,
-                                    modifier = Modifier.padding(vertical = 2.dp)
-                                )
+                        // Display Kodi movie title if playing
+                        kodiPlayingMovie?.let { kodiMovie ->
+                            Text(
+                                text = kodiMovie.title ?: "", // Provide a default empty string if title is null
+                                style = MaterialTheme.typography.headlineLarge,
+                                color = Color.White,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                        } ?: run {
+                            // Original movie details display
+                            // Movie MPAA rating
+                            if (showMpaaRating.value) {
+                                currentMovieWithDetails?.mpaaRating?.let { mpaaRating ->
+                                    Text(
+                                        text = "MPAA Rating: $mpaaRating",
+                                        color = Grey,
+                                        modifier = Modifier.padding(vertical = 2.dp)
+                                    )
+                                }
                             }
-                        }
 
                         // Movie release date
                         if (showReleaseDate.value) {
@@ -358,8 +413,8 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
                             }
                         }
                     }
-                }
-
+                    } // End of run block for original slideshow logic
+                } // End of kodiPlayingMovie?.let block
 
                 // Button to show trailer
                 IconButton(
@@ -379,6 +434,7 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
                         tint = Color.White // Set icon color to white for visibility
                     )
                 }
+
 
                 // Button to open settings
                 IconButton(
@@ -463,5 +519,6 @@ fun MoviePosterScreen(movieViewModel: MovieViewModel = viewModel(factory = Movie
                 }
             }
         }
+    }
     }
 }

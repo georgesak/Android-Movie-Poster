@@ -95,7 +95,17 @@ fun SettingsScreen(movieViewModel: MovieViewModel = viewModel()) {
         mutableStateOf(sharedPreferences.getBoolean("show_mpaa_rating", true))
     }
 
-fun saveSettings(
+    val (kodiIpAddress, setKodiIpAddress) = remember {
+        mutableStateOf(sharedPreferences.getString("kodi_ip_address", "") ?: "")
+    }
+    val (kodiPort, setKodiPort) = remember {
+        mutableStateOf(sharedPreferences.getInt("kodi_port", 8080))
+    }
+    val (kodiPollingInterval, setKodiPollingInterval) = remember {
+        mutableStateOf(sharedPreferences.getLong("kodi_polling_interval", 5000L)) // Default 5 seconds
+    }
+
+    fun saveSettings(
         sharedPreferences: SharedPreferences,
         transitionDelay: Long,
         apiKey: String,
@@ -105,6 +115,9 @@ fun saveSettings(
         showRuntime: Boolean,
         showReleaseDate: Boolean,
         showMpaaRating: Boolean,
+        kodiIpAddress: String,
+        kodiPort: Int,
+        kodiPollingInterval: Long,
         movieViewModel: MovieViewModel,
         context: Context
     ) {
@@ -117,6 +130,9 @@ fun saveSettings(
             putBoolean("show_runtime", showRuntime)
             putBoolean("show_release_date", showReleaseDate)
             putBoolean("show_mpaa_rating", showMpaaRating)
+            putString("kodi_ip_address", kodiIpAddress)
+            putInt("kodi_port", kodiPort)
+            putLong("kodi_polling_interval", kodiPollingInterval)
             apply()
         }
         movieViewModel.getPopularMovies(selectedGenreIds)
@@ -158,6 +174,9 @@ fun saveSettings(
                                 showRuntime,
                                 showReleaseDate,
                                 showMpaaRating,
+                                kodiIpAddress,
+                                kodiPort,
+                                kodiPollingInterval,
                                 movieViewModel,
                                 context
                             )
@@ -362,6 +381,48 @@ fun saveSettings(
                     )
                     Text("Show MPAA Rating")
                 }
+            }
+
+            // Kodi Settings Section
+            SettingsSection(title = "Kodi Settings") {
+                Text("Kodi IP Address", style = MaterialTheme.typography.titleMedium)
+                OutlinedTextField(
+                    value = kodiIpAddress,
+                    onValueChange = { setKodiIpAddress(it) },
+                    label = { Text("IP Address") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.padding(top = 8.dp))
+                Text("Kodi Port", style = MaterialTheme.typography.titleMedium)
+                OutlinedTextField(
+                    value = kodiPort.toString(),
+                    onValueChange = { newValue ->
+                        setKodiPort(newValue.toIntOrNull() ?: 8080)
+                    },
+                    label = { Text("Port") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.padding(top = 8.dp))
+                Text("Kodi Polling Interval (seconds)", style = MaterialTheme.typography.titleMedium)
+                OutlinedTextField(
+                    value = (kodiPollingInterval / 1000L).toString(),
+                    onValueChange = { newValue ->
+                        val seconds = newValue.toLongOrNull()
+                        val validSeconds = when {
+                            seconds == null -> 5L
+                            seconds < 1L -> 1L // Minimum 1 second
+                            else -> seconds
+                        }
+                        setKodiPollingInterval(validSeconds * 1000L)
+                    },
+                    label = { Text("Interval") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
 
             Spacer(modifier = Modifier.weight(1f)) // Push content to top if needed
