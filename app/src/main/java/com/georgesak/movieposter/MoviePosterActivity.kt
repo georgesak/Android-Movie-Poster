@@ -13,9 +13,11 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import com.georgesak.movieposter.data.Movie
 import com.georgesak.movieposter.data.MovieDetail
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -74,6 +76,7 @@ import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.views.YouTube
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import android.util.Log
+import com.georgesak.movieposter.Constants
 
 @OptIn(ExperimentalMaterial3Api::class) // Add opt-in for ExperimentalMaterial3Api
 class MoviePosterActivity : ComponentActivity() {
@@ -82,8 +85,8 @@ class MoviePosterActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         // Check if API key is set, if not, navigate to SettingsActivity
-        val sharedPreferences = getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
-        val apiKey = sharedPreferences.getString("api_key", "")
+        val sharedPreferences = getSharedPreferences(Constants.APP_SETTINGS_PREFS, Context.MODE_PRIVATE)
+        val apiKey = sharedPreferences.getString(Constants.API_KEY, "")
 
         if (apiKey.isNullOrEmpty()) {
             val settingsIntent = Intent(this, SettingsActivity::class.java)
@@ -116,22 +119,22 @@ fun MoviePosterScreen(
     var currentMovieIndex by remember { mutableStateOf(0) }
     var isPaused by remember { mutableStateOf(false) } // State to track if slideshow is paused
     val context = LocalContext.current // Get the current context
-    val sharedPreferences = context.getSharedPreferences("AppSettings", Context.MODE_PRIVATE) // Get SharedPreferences
-    val transitionDelay = sharedPreferences.getLong("transition_delay", 10000L) // Read transition delay (default 10 seconds)
+    val sharedPreferences = context.getSharedPreferences(Constants.APP_SETTINGS_PREFS, Context.MODE_PRIVATE) // Get SharedPreferences
+    val transitionDelay = sharedPreferences.getLong(Constants.TRANSITION_DELAY, Constants.DEFAULT_TRANSITION_DELAY) // Read transition delay (default 10 seconds)
     val selectedGenreIds = remember {
-        mutableStateOf(sharedPreferences.getStringSet("selected_genre_ids", emptySet())?.mapNotNull { it.toIntOrNull() }?.toSet() ?: emptySet())
+        mutableStateOf(sharedPreferences.getStringSet(Constants.SELECTED_GENRE_IDS, emptySet())?.mapNotNull { it.toIntOrNull() }?.toSet() ?: emptySet())
     }
     val trailerPlacement = remember {
-        mutableStateOf(sharedPreferences.getString("trailer_placement", "Bottom") ?: "Bottom")
+        mutableStateOf(sharedPreferences.getString(Constants.TRAILER_PLACEMENT, Constants.DEFAULT_TRAILER_PLACEMENT) ?: Constants.DEFAULT_TRAILER_PLACEMENT)
     }
     val showRuntime = remember {
-        mutableStateOf(sharedPreferences.getBoolean("show_runtime", true))
+        mutableStateOf(sharedPreferences.getBoolean(Constants.SHOW_RUNTIME, true))
     }
     val showReleaseDate = remember {
-        mutableStateOf(sharedPreferences.getBoolean("show_release_date", true))
+        mutableStateOf(sharedPreferences.getBoolean(Constants.SHOW_RELEASE_DATE, true))
     }
     val showMpaaRating = remember {
-        mutableStateOf(sharedPreferences.getBoolean("show_mpaa_rating", true))
+        mutableStateOf(sharedPreferences.getBoolean(Constants.SHOW_MPAA_RATING, true))
     }
     val trailerKey by movieViewModel.trailerKey.collectAsState()
     var swipeTrigger by remember { mutableStateOf(0) }
@@ -144,7 +147,7 @@ fun MoviePosterScreen(
         val fullWidth = with(LocalDensity.current) { maxWidth.toPx() }
 
         LaunchedEffect(movies, transitionDelay, isPaused, swipeTrigger, selectedGenreIds.value, isAnimatingSwipe, fullWidth) {
-            val currentSavedGenreIds = sharedPreferences.getStringSet("selected_genre_ids", emptySet())?.mapNotNull { it.toIntOrNull() }?.toSet() ?: emptySet()
+            val currentSavedGenreIds = sharedPreferences.getStringSet(Constants.SELECTED_GENRE_IDS, emptySet())?.mapNotNull { it.toIntOrNull() }?.toSet() ?: emptySet()
             if (movies.isEmpty() || selectedGenreIds.value != currentSavedGenreIds) {
                 selectedGenreIds.value = currentSavedGenreIds
                 movieViewModel.getPopularMovies(selectedGenreIds.value)
@@ -155,7 +158,7 @@ fun MoviePosterScreen(
                         delay(transitionDelay) // Use delay directly
                         val initialOffset = autoTransitionOffset.value
                         val targetOffset = -fullWidth // Use fullWidth here
-                        autoTransitionOffset.animateTo(targetOffset, animationSpec = tween(durationMillis = 2000)) // Animate over 2 seconds
+                        autoTransitionOffset.animateTo(targetOffset, animationSpec = tween(durationMillis = Constants.AUTO_TRANSITION_ANIMATION_DURATION_MILLIS)) // Animate over 2 seconds
                         currentMovieIndex = (currentMovieIndex + 1) % movies.size
                         movieViewModel.getMovieDetails(movies[currentMovieIndex].id) // Fetch details for the new movie
                         autoTransitionOffset.snapTo(0f) // Reset for new transition
@@ -198,7 +201,7 @@ fun MoviePosterScreen(
                                 change.consume()
                             },
                             onDragEnd = {
-                                val swipeThreshold = size.width * 0.43f
+                                val swipeThreshold = size.width * Constants.SWIPE_THRESHOLD_PERCENTAGE
                                 scope.launch {
                                     isAnimatingSwipe = true // Indicate that a swipe animation is starting
                                     val targetOffset = when {
@@ -207,7 +210,7 @@ fun MoviePosterScreen(
                                         else -> 0f
                                     }
 
-                                    dragOffset.animateTo(targetOffset, animationSpec = tween(durationMillis = 300))
+                                    dragOffset.animateTo(targetOffset, animationSpec = tween(durationMillis = Constants.SWIPE_ANIMATION_DURATION_MILLIS))
 
                                     if (targetOffset != 0f) {
                                         currentMovieIndex = if (targetOffset < 0) { // Swiped left
@@ -225,7 +228,7 @@ fun MoviePosterScreen(
                             },
                             onDragCancel = {
                                 scope.launch {
-                                    dragOffset.animateTo(0f, animationSpec = tween(durationMillis = 300))
+                                    dragOffset.animateTo(0f, animationSpec = tween(durationMillis = Constants.SWIPE_ANIMATION_DURATION_MILLIS))
                                     isPaused = false // Unpause on cancel
                                     isAnimatingSwipe = false // Reset animation state
                                 }
@@ -242,9 +245,9 @@ fun MoviePosterScreen(
                             context.startActivity(settingsIntent)
                         },
                         modifier = Modifier
-                            .alpha(0.25f)
+                            .alpha(Constants.ALPHA_TRANSLUCENT)
                             .align(Alignment.BottomEnd)
-                            .padding(bottom = 20.dp, end = 20.dp)
+                            .padding(bottom = Constants.PADDING_MEDIUM, end = Constants.PADDING_MEDIUM)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Settings,
@@ -253,221 +256,263 @@ fun MoviePosterScreen(
                         )
                     }
                 } else {
-                    val currentMovie = movies[currentMovieIndex]
-                    val nextMovie = movies[(currentMovieIndex + 1) % movies.size]
-                    val previousMovie = movies[(currentMovieIndex - 1 + movies.size) % movies.size]
+                    MoviePosterSlideshow(movies, currentMovieIndex, dragOffset, autoTransitionOffset, fullWidth)
 
-                    // Original slideshow logic
-                    // Render previous movie (appears from left when dragging right)
-                    if (dragOffset.value > 0f) {
-                        AsyncImage(
-                            model = ImageRequest.Builder(LocalContext.current)
-                                .data("https://image.tmdb.org/t/p/w500${previousMovie.posterPath}")
-                                .crossfade(1000) // Slow down fade effect to 1 second
-                                .build(),
-                            contentDescription = previousMovie.title,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .graphicsLayer {
-                                    translationX = dragOffset.value - fullWidth
-                                },
-                            contentScale = ContentScale.Fit
-                        )
-                    }
-
-                    // Render current movie
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data("https://image.tmdb.org/t/p/w500${currentMovie.posterPath}")
-                            .crossfade(1000) // Slow down fade effect to 1 second
-                            .build(),
-                        contentDescription = currentMovie.title,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .graphicsLayer { translationX = dragOffset.value + autoTransitionOffset.value },
-                        contentScale = ContentScale.Fit
+                    MovieDetailsOverlay(
+                        currentMovieWithDetails,
+                        showMpaaRating.value,
+                        showReleaseDate.value,
+                        showRuntime.value,
+                        modifier = Modifier.align(Alignment.BottomCenter)
                     )
 
-                    // Render next movie (appears from right when dragging left or delay is over)
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data("https://image.tmdb.org/t/p/w500${nextMovie.posterPath}")
-                            .crossfade(1000) // Slow down fade effect to 1 second
-                            .build(),
-                        contentDescription = nextMovie.title,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .graphicsLayer {
-                                translationX = fullWidth + dragOffset.value + autoTransitionOffset.value
-                            },
-                        contentScale = ContentScale.Fit
-                    )
-
-                    Column(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = 40.dp), // Adjust padding for the whole column
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        // Original movie details display
-                        // Movie tagline
-                        if (showMpaaRating.value) {
-                            currentMovieWithDetails?.tagline?.let { tagline ->
-                                Text(
-                                    text = "$tagline",
-                                    color = Grey,
-                                    modifier = Modifier.padding(vertical = 2.dp)
-                                )
+                    ControlButtons(
+                        isPaused = isPaused,
+                        onPlayTrailerClick = {
+                            if (movies.isNotEmpty()) {
+                                movieViewModel.getMovieTrailer(movies[currentMovieIndex].id)
                             }
+                        },
+                        onSettingsClick = {
+                            val settingsIntent = Intent(context, SettingsActivity::class.java)
+                            context.startActivity(settingsIntent)
                         }
-
-                        // Movie MPAA rating
-                        if (showMpaaRating.value) {
-                            currentMovieWithDetails?.mpaaRating?.let { mpaaRating ->
-                                Text(
-                                    text = "MPAA Rating: $mpaaRating",
-                                    color = Grey,
-                                    modifier = Modifier.padding(vertical = 2.dp)
-                                )
-                            }
-                        }
-
-                        // Movie release date
-                        if (showReleaseDate.value) {
-                            Log.d("MoviePosterActivity", "Showing Date" + currentMovieWithDetails?.release_date)
-                            currentMovieWithDetails?.release_date?.let { release_date ->
-                                Text(
-                                    text = "Release Date: $release_date",
-                                    color = Grey,
-                                    modifier = Modifier.padding(vertical = 2.dp)
-                                )
-                            }
-                        }
-
-                        // Movie runtime
-                        if (showRuntime.value) {
-                            currentMovieWithDetails?.runtime?.let { runtime ->
-                                val hours = runtime / 60
-                                val minutes = runtime % 60
-                                val runtimeText = when {
-                                    hours > 0 && minutes > 0 -> "${hours}h ${minutes}m"
-                                    hours > 0 -> "${hours}h"
-                                    minutes > 0 -> "${minutes}m"
-                                    else -> ""
-                                }
-                                if (runtimeText.isNotEmpty()) {
-                                    Text(
-                                        text = "Runtime: ${runtimeText}",
-                                        color = Grey,
-                                        modifier = Modifier.padding(vertical = 2.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Button to show trailer
-                IconButton(
-                    onClick = {
-                        if (movies.isNotEmpty()) {
-                            movieViewModel.getMovieTrailer(movies[currentMovieIndex].id)
-                        }
-                    },
-                    modifier = Modifier
-                        .alpha(0.25f)
-                        .align(Alignment.BottomStart)
-                        .padding(bottom = 20.dp, start = 20.dp) // Add some padding from the bottom and right
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Movie,
-                        contentDescription = "Play Trailer",
-                        tint = Color.White // Set icon color to white for visibility
                     )
                 }
 
-
-                // Button to open settings
-                IconButton(
-                    onClick = {
-                        val settingsIntent = Intent(context, SettingsActivity::class.java)
-                        context.startActivity(settingsIntent)
-                    },
-                    modifier = Modifier
-                        .alpha(0.25f)
-                        .align(Alignment.BottomEnd) // Align to bottom left
-                        .padding(bottom = 20.dp, end = 20.dp) // Add some padding from the bottom and left
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = "Open Settings",
-                        tint = Color.White // Set icon color to white for visibility
-                    )
-                }
-
-                // Paused indicator
-                if (isPaused) {
-                    Icon(
-                        imageVector = Icons.Default.Pause,
-                        contentDescription = "Paused",
-                        tint = Color.White,
-                        modifier = Modifier
-                            .alpha(0.25f) // Make it 25% translucent
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = 20.dp)
-                    )
-                }
-
-                // Display trailer dialog if trailerKey is not null
                 if (trailerKey != null) {
-                    Dialog(
-                        onDismissRequest = { movieViewModel.clearTrailerKey() },
-                        properties = DialogProperties(usePlatformDefaultWidth = false)
-                    ) {
-                        Box(modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.8f)) // Semi-transparent black background
-                            .clickable { movieViewModel.clearTrailerKey() } // Dismiss on click outside player
-                            , contentAlignment = when (trailerPlacement.value) {
-                                "Top" -> Alignment.TopCenter
-                                "Middle" -> Alignment.Center
-                                "Bottom" -> Alignment.BottomCenter
-                                else -> Alignment.BottomCenter
-                            }
-                        ) {
-                            val lifecycleOwner = LocalLifecycleOwner.current
-                            AndroidView(
-                                factory = { context ->
-                                    YouTubePlayerView(context).apply {
-                                        enableAutomaticInitialization = false
-                                        lifecycleOwner.lifecycle.addObserver(this)
-                                        val options = IFramePlayerOptions.Builder().controls(0).rel(0).ivLoadPolicy(0).build()
-                                        initialize(object : AbstractYouTubePlayerListener() {
-                                            override fun onReady(youTubePlayer: YouTubePlayer) {
-                                                trailerKey?.let { key ->
-                                                    youTubePlayer.loadVideo(key, 0f)
-                                                }
-                                            }
-
-                                            override fun onStateChange(
-                                                youTubePlayer: YouTubePlayer,
-                                                state: com.pierfrancescosoffritti.androidyoutubeplayer.core.player.PlayerConstants.PlayerState
-                                            ) {
-                                                if (state == com.pierfrancescosoffritti.androidyoutubeplayer.core.player.PlayerConstants.PlayerState.ENDED) {
-                                                    movieViewModel.clearTrailerKey()
-                                                }
-                                            }
-                                        }, options)
-                                    }
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .wrapContentHeight()
-                                    .padding(bottom = 100.dp)
-                            )
-                        }
-                    }
+                    TrailerDialog(trailerKey, trailerPlacement.value) { movieViewModel.clearTrailerKey() }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun MoviePosterSlideshow(
+    movies: List<Movie>,
+    currentMovieIndex: Int,
+    dragOffset: Animatable<Float, androidx.compose.animation.core.AnimationVector1D>,
+    autoTransitionOffset: Animatable<Float, androidx.compose.animation.core.AnimationVector1D>,
+    fullWidth: Float
+) {
+    val currentMovie = movies[currentMovieIndex]
+    val nextMovie = movies[(currentMovieIndex + 1) % movies.size]
+    val previousMovie = movies[(currentMovieIndex - 1 + movies.size) % movies.size]
+
+    // Render previous movie (appears from left when dragging right)
+    if (dragOffset.value > 0f) {
+        AsyncImage(
+            model = ImageRequest.Builder(LocalContext.current)
+                .data("${Constants.TMDB_IMAGE_BASE_URL}${previousMovie.posterPath}")
+                .crossfade(Constants.CROSSFADE_DURATION_MILLIS)
+                .build(),
+            contentDescription = previousMovie.title,
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    translationX = dragOffset.value - fullWidth
+                },
+            contentScale = ContentScale.Fit
+        )
+    }
+
+    // Render current movie
+    AsyncImage(
+        model = ImageRequest.Builder(LocalContext.current)
+            .data("${Constants.TMDB_IMAGE_BASE_URL}${currentMovie.posterPath}")
+            .crossfade(Constants.CROSSFADE_DURATION_MILLIS)
+            .build(),
+        contentDescription = currentMovie.title,
+        modifier = Modifier
+            .fillMaxSize()
+            .graphicsLayer { translationX = dragOffset.value + autoTransitionOffset.value },
+        contentScale = ContentScale.Fit
+    )
+
+    // Render next movie (appears from right when dragging left or delay is over)
+    AsyncImage(
+        model = ImageRequest.Builder(LocalContext.current)
+            .data("${Constants.TMDB_IMAGE_BASE_URL}${nextMovie.posterPath}")
+            .crossfade(Constants.CROSSFADE_DURATION_MILLIS)
+            .build(),
+        contentDescription = nextMovie.title,
+        modifier = Modifier
+            .fillMaxSize()
+            .graphicsLayer {
+                translationX = fullWidth + dragOffset.value + autoTransitionOffset.value
+            },
+        contentScale = ContentScale.Fit
+    )
+}
+
+@Composable
+fun MovieDetailsOverlay(
+    currentMovieWithDetails: MovieDetail?,
+    showMpaaRating: Boolean,
+    showReleaseDate: Boolean,
+    showRuntime: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .padding(bottom = Constants.PADDING_LARGE),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        if (showMpaaRating) {
+            currentMovieWithDetails?.tagline?.let { tagline ->
+                Text(
+                    text = tagline,
+                    color = Grey,
+                    modifier = Modifier.padding(vertical = Constants.PADDING_SMALL)
+                )
+            }
+        }
+
+        if (showMpaaRating) {
+            currentMovieWithDetails?.mpaaRating?.let { mpaaRating ->
+                Text(
+                    text = "MPAA Rating: $mpaaRating",
+                    color = Grey,
+                    modifier = Modifier.padding(vertical = Constants.PADDING_SMALL)
+                )
+            }
+        }
+
+        if (showReleaseDate) {
+            Log.d("MoviePosterActivity", "Showing Date" + currentMovieWithDetails?.release_date)
+            currentMovieWithDetails?.release_date?.let { release_date ->
+                Text(
+                    text = "Release Date: $release_date",
+                    color = Grey,
+                    modifier = Modifier.padding(vertical = Constants.PADDING_SMALL)
+                )
+            }
+        }
+
+        if (showRuntime) {
+            currentMovieWithDetails?.runtime?.let { runtime ->
+                val hours = runtime / 60
+                val minutes = runtime % 60
+                val runtimeText = when {
+                    hours > 0 && minutes > 0 -> "${hours}h ${minutes}m"
+                    hours > 0 -> "${hours}h"
+                    minutes > 0 -> "${minutes}m"
+                    else -> ""
+                }
+                if (runtimeText.isNotEmpty()) {
+                    Text(
+                        text = "Runtime: ${runtimeText}",
+                        color = Grey,
+                        modifier = Modifier.padding(vertical = Constants.PADDING_SMALL)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ControlButtons(
+    isPaused: Boolean,
+    onPlayTrailerClick: () -> Unit,
+    onSettingsClick: () -> Unit
+) {
+    Box(modifier = Modifier.fillMaxSize()) { // Wrap content in a Box to provide BoxScope for align
+        IconButton(
+            onClick = onPlayTrailerClick,
+            modifier = Modifier
+                .alpha(Constants.ALPHA_TRANSLUCENT)
+                .align(Alignment.BottomStart)
+                .padding(bottom = Constants.PADDING_MEDIUM, start = Constants.PADDING_MEDIUM)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Movie,
+                contentDescription = "Play Trailer",
+                tint = Color.White
+            )
+        }
+
+        IconButton(
+            onClick = onSettingsClick,
+            modifier = Modifier
+                .alpha(Constants.ALPHA_TRANSLUCENT)
+                .align(Alignment.BottomEnd)
+                .padding(bottom = Constants.PADDING_MEDIUM, end = Constants.PADDING_MEDIUM)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Settings,
+                contentDescription = "Open Settings",
+                tint = Color.White
+            )
+        }
+
+        if (isPaused) {
+            Icon(
+                imageVector = Icons.Default.Pause,
+                contentDescription = "Paused",
+                tint = Color.White,
+                modifier = Modifier
+                    .alpha(Constants.ALPHA_TRANSLUCENT)
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = Constants.PADDING_MEDIUM)
+            )
+        }
+    }
+}
+
+@Composable
+fun TrailerDialog(
+    trailerKey: String?,
+    trailerPlacement: String,
+    onDismiss: () -> Unit
+) {
+    if (trailerKey != null) {
+        Dialog(
+            onDismissRequest = onDismiss,
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Box(modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = Constants.DIALOG_BACKGROUND_ALPHA))
+                .clickable { onDismiss() }
+                , contentAlignment = when (trailerPlacement) {
+                    "Top" -> Alignment.TopCenter
+                    "Middle" -> Alignment.Center
+                    "Bottom" -> Alignment.BottomCenter
+                    else -> Alignment.BottomCenter
+                }
+            ) {
+                val lifecycleOwner = LocalLifecycleOwner.current
+                AndroidView(
+                    factory = { context ->
+                        YouTubePlayerView(context).apply {
+                            enableAutomaticInitialization = false
+                            lifecycleOwner.lifecycle.addObserver(this)
+                            val options = IFramePlayerOptions.Builder().controls(0).rel(0).ivLoadPolicy(0).build()
+                            initialize(object : AbstractYouTubePlayerListener() {
+                                override fun onReady(youTubePlayer: YouTubePlayer) {
+                                    trailerKey.let { key ->
+                                        youTubePlayer.loadVideo(key, 0f)
+                                    }
+                                }
+
+                                override fun onStateChange(
+                                    youTubePlayer: YouTubePlayer,
+                                    state: com.pierfrancescosoffritti.androidyoutubeplayer.core.player.PlayerConstants.PlayerState
+                                ) {
+                                    if (state == com.pierfrancescosoffritti.androidyoutubeplayer.core.player.PlayerConstants.PlayerState.ENDED) {
+                                        onDismiss()
+                                    }
+                                }
+                            }, options)
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .wrapContentHeight()
+                        .padding(bottom = Constants.PADDING_TRAILER_BOTTOM)
+                )
             }
         }
     }

@@ -2,6 +2,7 @@ package com.georgesak.movieposter
 
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -35,6 +36,7 @@ import coil.request.ImageRequest
 import com.georgesak.movieposter.ui.MovieViewModel
 import com.georgesak.movieposter.ui.theme.MoviePosterTheme
 import com.georgesak.movieposter.data.KodiItem
+import com.georgesak.movieposter.Constants
 
 class KodiActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -62,7 +64,7 @@ fun KodiScreen(
     movieViewModel: MovieViewModel = viewModel(factory = MovieViewModel.Factory)
 ) {
     val context = LocalContext.current
-    val sharedPreferences = context.getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
+    val sharedPreferences = context.getSharedPreferences(Constants.APP_SETTINGS_PREFS, Context.MODE_PRIVATE)
     val kodiPlayingMovie by movieViewModel.kodiPlayingMovie.collectAsState()
 
     LaunchedEffect(kodiPlayingMovie) {
@@ -76,61 +78,76 @@ fun KodiScreen(
     }
 
     kodiPlayingMovie?.let { kodiMovie ->
-        val kodiIpAddress = sharedPreferences.getString("kodi_ip_address", "") ?: ""
-        val kodiPort = sharedPreferences.getInt("kodi_port", 8080)
-        val kodiBaseUrl = if (kodiIpAddress.isNotEmpty()) "http://$kodiIpAddress:$kodiPort/image/" else ""
+        val decodedAndReplacedUrl = buildKodiImageUrl(context, sharedPreferences, kodiMovie)
+        val authorizationHeader = getKodiAuthorizationHeader(sharedPreferences)
+        KodiMovieDisplay(kodiMovie, decodedAndReplacedUrl, authorizationHeader)
+    }
+}
 
-        val imageUrl = kodiMovie.art?.poster ?: kodiMovie.art?.fanart ?: kodiMovie.thumbnail
-        val decodedAndReplacedUrl = imageUrl?.let { url ->
-            try {
-                val tempUrl = url
-                if (tempUrl.startsWith("image://")) {
-                    tempUrl.replace("image://", "")
-                }
-                val decodedUrl = kodiBaseUrl + java.net.URLEncoder.encode(tempUrl, "UTF-8")
-                decodedUrl
-            } catch (e: Exception) {
-                Log.e("KodiActivity", "Error decoding or replacing Kodi image URL: $url", e)
-                url // Return original URL on error
-            }
+@Composable
+private fun buildKodiImageUrl(context: Context, sharedPreferences: android.content.SharedPreferences, kodiMovie: KodiItem): String? {
+    val kodiIpAddress = sharedPreferences.getString(Constants.KODI_IP_ADDRESS, "") ?: ""
+    val kodiPort = sharedPreferences.getInt(Constants.KODI_PORT, Constants.DEFAULT_KODI_PORT)
+    val kodiBaseUrl = if (kodiIpAddress.isNotEmpty()) "${Constants.HTTP_PREFIX}$kodiIpAddress:$kodiPort/image/" else ""
+
+    val imageUrl = kodiMovie.art?.poster ?: kodiMovie.art?.fanart ?: kodiMovie.thumbnail
+    Log.d("KodiActivity", "imageUrl: $imageUrl")
+
+    return imageUrl?.let { url ->
+        try {
+            val decodedUrl = kodiBaseUrl + java.net.URLEncoder.encode(url, "UTF-8")
+            decodedUrl
+        } catch (e: Exception) {
+            Log.e("KodiActivity", "Error decoding or replacing Kodi image URL: $url", e)
+            url // Return original URL on error
         }
-        val username = sharedPreferences.getString("kodi_username", "") ?: ""
-        val password = sharedPreferences.getString("kodi_password", "") ?: ""
-        var authorizationHeader = ""
-        if (username != "" && password != "") {
-            val credentials = "$username:$password"
-            val encodedCredentials = android.util.Base64.encodeToString(credentials.toByteArray(), android.util.Base64.NO_WRAP)
-            authorizationHeader = "Basic $encodedCredentials"
-        }
-        Log.d("KodiActivity", "decodedAndReplacedUrl: ${decodedAndReplacedUrl}")
-        Box(modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black)) {
-            AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(decodedAndReplacedUrl)
-                    .addHeader("Authorization", authorizationHeader)
-                    .crossfade(1000)
-                    .build(),
-                contentDescription = kodiMovie.title,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Fit
+    }
+}
+
+private fun getKodiAuthorizationHeader(sharedPreferences: SharedPreferences): String {
+    val username = sharedPreferences.getString(Constants.KODI_USERNAME, "") ?: ""
+    val password = sharedPreferences.getString(Constants.KODI_PASSWORD, "") ?: ""
+    if (username.isEmpty() || password.isEmpty()) {
+        return ""
+    }
+    val credentials = "$username:$password"
+    val encodedCredentials = android.util.Base64.encodeToString(credentials.toByteArray(), android.util.Base64.NO_WRAP)
+    return "Basic $encodedCredentials"
+}
+
+@Composable
+fun KodiMovieDisplay(
+    kodiMovie: KodiItem,
+    decodedAndReplacedUrl: String?,
+    authorizationHeader: String
+) {
+    Box(modifier = Modifier
+        .fillMaxSize()
+        .background(Color.Black)) {
+        AsyncImage(
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(decodedAndReplacedUrl)
+                .addHeader("Authorization", authorizationHeader)
+                .crossfade(Constants.CROSSFADE_DURATION_MILLIS)
+                .build(),
+            contentDescription = kodiMovie.title,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Fit
+        )
+
+        Column(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .background(Color.Black.copy(alpha = Constants.KODI_OVERLAY_ALPHA))
+                .padding(vertical = Constants.PADDING_MEDIUM),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Now Playing: " + (kodiMovie.title ?: kodiMovie.label),
+                style = MaterialTheme.typography.headlineSmall,
+                color = Color.Gray
             )
-
-            Column(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .fillMaxWidth()
-                    .background(Color.Black.copy(alpha = 0.7f))
-                    .padding(vertical = 20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "Now Playing: " + (kodiMovie.title ?: kodiMovie.label),
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = Color.Gray
-                )
-            }
         }
     }
 }
