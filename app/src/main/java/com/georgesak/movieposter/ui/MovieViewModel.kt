@@ -11,25 +11,21 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.lifecycle.viewModelScope
+import com.georgesak.movieposter.MoviePosterApplication
 import com.georgesak.movieposter.data.Genre
-import com.georgesak.movieposter.data.KodiActivePlayer
 import com.georgesak.movieposter.data.KodiItem
-import com.georgesak.movieposter.data.KodiRpcRequest
 import com.georgesak.movieposter.data.Movie
 import com.georgesak.movieposter.data.MovieDetail
 import com.georgesak.movieposter.network.ApiService
-import com.georgesak.movieposter.network.KodiApiClient
-import com.georgesak.movieposter.network.KodiApiService
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
+import com.georgesak.movieposter.network.KodiMonitor
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.Job
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
-class MovieViewModel(application: Application) : AndroidViewModel(application) { // Update constructor
+class MovieViewModel(application: Application, private val kodiMonitor: KodiMonitor) : AndroidViewModel(application) {
 
     private val _movies = mutableStateOf<List<Movie>>(emptyList())
     val movies: State<List<Movie>> = _movies
@@ -43,10 +39,7 @@ class MovieViewModel(application: Application) : AndroidViewModel(application) {
     private val _trailerKey = MutableStateFlow<String?>(null)
     val trailerKey: StateFlow<String?> = _trailerKey.asStateFlow()
 
-    private val _kodiPlayingMovie = MutableStateFlow<KodiItem?>(null)
-    val kodiPlayingMovie: StateFlow<KodiItem?> = _kodiPlayingMovie.asStateFlow()
-
-    private var monitoringJob: Job? = null
+    val kodiPlayingMovie: StateFlow<KodiItem?> = kodiMonitor.kodiPlayingMovie
 
     private val apiService: ApiService by lazy {
         Retrofit.Builder()
@@ -59,7 +52,7 @@ class MovieViewModel(application: Application) : AndroidViewModel(application) {
     init {
         getMovieGenres()
         getPopularMovies()
-        startMonitoringKodi()
+        // Kodi monitoring is now handled by KodiMonitor in MoviePosterApplication
     }
 
     private fun getApiKey(): String {
@@ -67,119 +60,9 @@ class MovieViewModel(application: Application) : AndroidViewModel(application) {
         return sharedPreferences.getString("api_key", "") ?: ""
     }
 
-    private fun getKodiApiService(): KodiApiService? {
-        val sharedPreferences = getApplication<Application>().getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
-        val ipAddress = sharedPreferences.getString("kodi_ip_address", "")
-        val port = sharedPreferences.getInt("kodi_port", 8080)
-        val username = sharedPreferences.getString("kodi_username", "") ?: ""
-        val password = sharedPreferences.getString("kodi_password", "") ?: ""
-        return if (!ipAddress.isNullOrEmpty()) {
-            KodiApiClient.createKodiApiService(ipAddress, port, username, password)
-        } else {
-            null
-        }
-    }
-
-    fun startMonitoringKodi() {
-        Log.d(TAG, "Starting Kodi monitoring...")
-        monitoringJob?.cancel() // Cancel any existing job
-        monitoringJob = viewModelScope.launch {
-            val pollingInterval = getApplication<Application>().getSharedPreferences("AppSettings", Context.MODE_PRIVATE).getLong("kodi_polling_interval", 5000L)
-            while (true) {
-                try {
-                    val kodiApiService = getKodiApiService()
-                    if (kodiApiService == null) {
-                        Log.d(TAG, "Kodi API service is null. Check IP address and port settings.")
-                        _kodiPlayingMovie.value = null
-                        delay(pollingInterval)
-                        continue
-                    }
-                    Log.d(TAG, "Kodi API service created. Polling interval: $pollingInterval ms")
-
-                    // 1. Get active players
-                    val activePlayersRequest = KodiRpcRequest(
-                        id = 1,
-                        method = "Player.GetActivePlayers"
-                    )
-                    val activePlayersResponse = kodiApiService.getActivePlayers(activePlayersRequest)
-
-                    if (activePlayersResponse.isSuccessful) {
-                        val activePlayers = activePlayersResponse.body()?.result
-                        Log.d(TAG, "Active players: $activePlayers")
-
-                        val videoPlayer = activePlayers?.find { it.type == "video" }
-
-                        if (videoPlayer != null) {
-                            Log.d(TAG, "Video player found: ${videoPlayer.playerid}")
-                            // 2. Get player properties for the active video player
-                            val playerPropertiesRequest = KodiRpcRequest(
-                                id = 2,
-                                method = "Player.GetProperties",
-                                params = mapOf(
-                                    "playerid" to videoPlayer.playerid,
-                                    "properties" to listOf("speed", "time", "totaltime", "percentage")
-                                )
-                            )
-                            val playerPropertiesResponse = kodiApiService.getPlayerProperties(playerPropertiesRequest)
-
-                            if (playerPropertiesResponse.isSuccessful) {
-                                val playerProperties = playerPropertiesResponse.body()?.result
-                                Log.d(TAG, "Player properties: $playerProperties")
-                                // 3. Get item details for the active player
-                                val playerItemRequest = KodiRpcRequest(
-                                    id = 3,
-                                    method = "Player.GetItem",
-                                    params = mapOf(
-                                        "playerid" to videoPlayer.playerid,
-                                        "properties" to listOf("title", "file", "thumbnail", "fanart", "art", "year", "plot", "genre", "director", "cast", "rating", "tagline", "runtime", "streamdetails")
-                                    )
-                                )
-                                val playerItemResponse = kodiApiService.getPlayerItem(playerItemRequest)
-
-                                if (playerItemResponse.isSuccessful) {
-                                    val kodiItem = playerItemResponse.body()?.result?.item
-                                    if (kodiItem != null) {
-                                        Log.d(TAG, "Kodi item playing: ${kodiItem.label}")
-                                        _kodiPlayingMovie.value = kodiItem
-                                    } else {
-                                        Log.d(TAG, "No item found for active player. Setting kodiPlayingMovie to null.")
-                                        _kodiPlayingMovie.value = null
-                                    }
-                                } else {
-                                    _kodiPlayingMovie.value = null
-                                    Log.e(TAG, "Error getting player item: ${playerItemResponse.code()} - ${playerItemResponse.errorBody()?.string()}")
-                                }
-                            } else {
-                                _kodiPlayingMovie.value = null
-                                Log.e(TAG, "Error getting player properties: ${playerPropertiesResponse.code()} - ${playerPropertiesResponse.errorBody()?.string()}")
-                            }
-                        } else {
-                            Log.d(TAG, "No video player active. Setting kodiPlayingMovie to null.")
-                            _kodiPlayingMovie.value = null // No video player active
-                        }
-                    } else {
-                        _kodiPlayingMovie.value = null
-                        Log.e(TAG, "Error getting active players: ${activePlayersResponse.code()} - ${activePlayersResponse.errorBody()?.string()}")
-                    }
-                } catch (e: Exception) {
-                    _kodiPlayingMovie.value = null
-                    Log.e(TAG, "Error monitoring Kodi: ${e.message}", e)
-                }
-                delay(pollingInterval)
-            }
-        }
-    }
-
-    fun stopMonitoringKodi() {
-        Log.d(TAG, "Stopping Kodi monitoring.")
-        monitoringJob?.cancel()
-        monitoringJob = null
-        _kodiPlayingMovie.value = null // Clear playing movie when monitoring stops
-    }
-
     override fun onCleared() {
         super.onCleared()
-        stopMonitoringKodi()
+        // Kodi monitoring is now handled by KodiMonitor, no need to stop here
     }
 
     fun getPopularMovies(genreIds: Set<Int>? = null) {
@@ -304,9 +187,10 @@ class MovieViewModel(application: Application) : AndroidViewModel(application) {
         val Factory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
-                val application = extras[APPLICATION_KEY]
+                val application = extras[APPLICATION_KEY] as Application
+                val kodiMonitor = (application as MoviePosterApplication).kodiMonitor
                 if (modelClass.isAssignableFrom(MovieViewModel::class.java)) {
-                    return MovieViewModel(application as Application) as T
+                    return MovieViewModel(application, kodiMonitor) as T
                 }
                 throw IllegalArgumentException("Unknown ViewModel class")
             }

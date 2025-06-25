@@ -76,7 +76,7 @@ import kotlinx.coroutines.launch
 import android.util.Log
 
 @OptIn(ExperimentalMaterial3Api::class) // Add opt-in for ExperimentalMaterial3Api
-class MainActivity : ComponentActivity() {
+class MoviePosterActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -88,7 +88,7 @@ class MainActivity : ComponentActivity() {
         if (apiKey.isNullOrEmpty()) {
             val settingsIntent = Intent(this, SettingsActivity::class.java)
             startActivity(settingsIntent)
-            finish() // Finish MainActivity so the user can't go back to it without setting the key
+            finish() // Finish MoviePosterActivity so the user can't go back to it without setting the key
         } else {
             setContent {
                 // Enable immersive mode
@@ -140,19 +140,9 @@ fun MoviePosterScreen(
     var isAnimatingSwipe by remember { mutableStateOf(false) }
     val autoTransitionOffset = remember { Animatable(0f) }
 
-    val kodiPlayingMovie by movieViewModel.kodiPlayingMovie.collectAsState() // Observe Kodi playing movie
-
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val fullWidth = with(LocalDensity.current) { maxWidth.toPx() }
 
-        LaunchedEffect(trailerKey, kodiPlayingMovie) {
-            isPaused = trailerKey != null || kodiPlayingMovie != null
-            if (kodiPlayingMovie != null) {
-                Log.d("MainActivity", "Kodi movie playing: ${kodiPlayingMovie?.label}")
-            }
-        }
-
-        // Moved LaunchedEffect inside BoxWithConstraints to access fullWidth
         LaunchedEffect(movies, transitionDelay, isPaused, swipeTrigger, selectedGenreIds.value, isAnimatingSwipe, fullWidth) {
             val currentSavedGenreIds = sharedPreferences.getStringSet("selected_genre_ids", emptySet())?.mapNotNull { it.toIntOrNull() }?.toSet() ?: emptySet()
             if (movies.isEmpty() || selectedGenreIds.value != currentSavedGenreIds) {
@@ -173,6 +163,20 @@ fun MoviePosterScreen(
                         delay(100)
                     }
                 }
+            }
+        }
+
+        // Observe Kodi playing movie and launch KodiActivity if a movie is playing
+        val kodiPlayingMovie by movieViewModel.kodiPlayingMovie.collectAsState()
+        LaunchedEffect(kodiPlayingMovie) {
+            if (kodiPlayingMovie != null) {
+                Log.d("MoviePosterActivity", "Kodi is active. Launching KodiActivity. Movie: ${kodiPlayingMovie?.title ?: kodiPlayingMovie?.label}")
+                val kodiIntent = Intent(context, KodiActivity::class.java)/*.apply {
+                    addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                }*/
+                context.startActivity(kodiIntent)
+            } else {
+                Log.d("MoviePosterActivity", "Kodi is not active (kodiPlayingMovie is null).")
             }
         }
 
@@ -253,68 +257,7 @@ fun MoviePosterScreen(
                     val nextMovie = movies[(currentMovieIndex + 1) % movies.size]
                     val previousMovie = movies[(currentMovieIndex - 1 + movies.size) % movies.size]
 
-                    Log.d("MainActivity", "Kodi poster: ${kodiPlayingMovie?.art?.poster}")
-                    // Display Kodi movie poster if a movie is playing on Kodi
-                    kodiPlayingMovie?.let { kodiMovie ->
-                        val kodiIpAddress = sharedPreferences.getString("kodi_ip_address", "") ?: ""
-                        val kodiPort = sharedPreferences.getInt("kodi_port", 8080)
-                        val kodiBaseUrl = if (kodiIpAddress.isNotEmpty()) "http://$kodiIpAddress:$kodiPort/image/" else ""
-
-                        val imageUrl = kodiMovie.art?.poster ?: kodiMovie.art?.fanart ?: kodiMovie.thumbnail
-                        val decodedAndReplacedUrl = imageUrl?.let { url ->
-                            try {
-                                val tempUrl = url
-                                if (tempUrl.startsWith("image://")) {
-                                    tempUrl.replace("image://", "")
-                                }
-                                val decodedUrl = kodiBaseUrl + java.net.URLEncoder.encode(tempUrl, "UTF-8")
-                                decodedUrl
-                            } catch (e: Exception) {
-                                Log.e("MainActivity", "Error decoding or replacing Kodi image URL: $url", e)
-                                url // Return original URL on error
-                            }
-                        }
-                        // 2. Encode the credentials for Basic Auth
-                        val username = sharedPreferences.getString("kodi_username", "") ?: ""
-                        val password = sharedPreferences.getString("kodi_password", "") ?: ""
-                        var authorizationHeader = ""
-                        if (username != "" && password != "") {
-                            val credentials = "$username:$password"
-                            val encodedCredentials = android.util.Base64.encodeToString(credentials.toByteArray(), android.util.Base64.NO_WRAP)
-                            authorizationHeader = "Basic $encodedCredentials"
-                        }
-                        Log.d("MainActivity", "decodedAndReplacedUrl: ${decodedAndReplacedUrl}")
-                        Box(modifier = Modifier.fillMaxSize()) {
-                            AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current)
-                                    .data(decodedAndReplacedUrl)
-                                    .addHeader("Authorization", authorizationHeader) // Add the Authorization header
-                                    .crossfade(1000)
-                                    .build(),
-                                contentDescription = kodiMovie.title,
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Fit
-                            )
-
-                            // "Now Playing" banner at the top
-                            Column(
-                                modifier = Modifier
-                                    .align(Alignment.TopCenter)
-                                    .fillMaxWidth()
-                                    .background(Color.Black.copy(alpha = 0.7f)) // Semi-transparent black background
-                                    .padding(vertical = 20.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text(
-                                    text = "Now Playing: " + kodiMovie.title ?: kodiMovie.label,
-                                    style = MaterialTheme.typography.headlineSmall,
-                                    color = Color.Gray
-                                )
-                            }
-                        }
-                    } ?: run {
-                        // Original slideshow logic
-
+                    // Original slideshow logic
                     // Render previous movie (appears from left when dragging right)
                     if (dragOffset.value > 0f) {
                         AsyncImage(
@@ -391,7 +334,7 @@ fun MoviePosterScreen(
 
                         // Movie release date
                         if (showReleaseDate.value) {
-                            Log.d("MainActivity", "Showing Date" + currentMovieWithDetails?.release_date)
+                            Log.d("MoviePosterActivity", "Showing Date" + currentMovieWithDetails?.release_date)
                             currentMovieWithDetails?.release_date?.let { release_date ->
                                 Text(
                                     text = "Release Date: $release_date",
@@ -422,28 +365,25 @@ fun MoviePosterScreen(
                             }
                         }
                     }
-                    } // End of run block for original slideshow logic
-                } // End of kodiPlayingMovie?.let block
+                }
 
                 // Button to show trailer
-                if (kodiPlayingMovie == null) { // Only show trailer button if Kodi is not playing a movie
-                    IconButton(
-                        onClick = {
-                            if (movies.isNotEmpty()) {
-                                movieViewModel.getMovieTrailer(movies[currentMovieIndex].id)
-                            }
-                        },
-                        modifier = Modifier
-                            .alpha(0.25f)
-                            .align(Alignment.BottomStart)
-                            .padding(bottom = 20.dp, start = 20.dp) // Add some padding from the bottom and right
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Movie,
-                            contentDescription = "Play Trailer",
-                            tint = Color.White // Set icon color to white for visibility
-                        )
-                    }
+                IconButton(
+                    onClick = {
+                        if (movies.isNotEmpty()) {
+                            movieViewModel.getMovieTrailer(movies[currentMovieIndex].id)
+                        }
+                    },
+                    modifier = Modifier
+                        .alpha(0.25f)
+                        .align(Alignment.BottomStart)
+                        .padding(bottom = 20.dp, start = 20.dp) // Add some padding from the bottom and right
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Movie,
+                        contentDescription = "Play Trailer",
+                        tint = Color.White // Set icon color to white for visibility
+                    )
                 }
 
 
@@ -466,7 +406,7 @@ fun MoviePosterScreen(
                 }
 
                 // Paused indicator
-                if (isPaused && kodiPlayingMovie == null) {
+                if (isPaused) {
                     Icon(
                         imageVector = Icons.Default.Pause,
                         contentDescription = "Paused",

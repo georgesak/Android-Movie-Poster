@@ -9,14 +9,20 @@ import coil.ImageLoader
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import coil.request.CachePolicy
+import com.georgesak.movieposter.network.KodiMonitor
 
 class MoviePosterApplication : Application(), ViewModelStoreOwner {
 
     private lateinit var appViewModelStore: ViewModelStore
+    lateinit var kodiMonitor: KodiMonitor
+        private set
 
     override fun onCreate() {
         super.onCreate()
         appViewModelStore = ViewModelStore()
+
+        kodiMonitor = KodiMonitor(this)
+        kodiMonitor.startMonitoringKodi()
 
         Coil.setImageLoader(
             ImageLoader.Builder(this)

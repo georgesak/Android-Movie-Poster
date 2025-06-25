@@ -148,7 +148,7 @@ fun SettingsScreen(movieViewModel: MovieViewModel = viewModel()) {
             apply()
         }
         movieViewModel.getPopularMovies(selectedGenreIds)
-        val intent = android.content.Intent(context, MainActivity::class.java)
+        val intent = android.content.Intent(context, MoviePosterActivity::class.java)
         context.startActivity(intent)
     }
     Scaffold(
@@ -167,7 +167,7 @@ fun SettingsScreen(movieViewModel: MovieViewModel = viewModel()) {
                     Button(
                         onClick = {
                             // Navigate back to MainActivity without saving
-                            val intent = android.content.Intent(context, MainActivity::class.java)
+                            val intent = android.content.Intent(context, MoviePosterActivity::class.java)
                             context.startActivity(intent)
                         },
                         modifier = Modifier.padding(end = 8.dp)
