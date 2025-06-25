@@ -90,17 +90,6 @@ class MainActivity : ComponentActivity() {
             startActivity(settingsIntent)
             finish() // Finish MainActivity so the user can't go back to it without setting the key
         } else {
-            // Request POST_NOTIFICATIONS permission for Android 13+
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                if (ContextCompat.checkSelfPermission(
-                        this,
-                        Manifest.permission.POST_NOTIFICATIONS
-                    ) != PackageManager.PERMISSION_GRANTED
-                ) {
-                    requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                }
-            }
-
             setContent {
                 // Enable immersive mode
                 val window = (this.window)
@@ -116,16 +105,6 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-
-    private val requestPermissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
-            if (isGranted) {
-                // Permission is granted. You can start the service here if needed,
-                // but it's already started in onCreate.
-            } else {
-                // Permission is denied. Handle this case, perhaps inform the user.
-            }
-        }
 }
 
 @Composable
@@ -249,7 +228,7 @@ fun MoviePosterScreen(
                             }
                         )
                     },
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.TopCenter
             ) {
                 if (movies.isEmpty()) {
                     CircularProgressIndicator()
@@ -281,7 +260,7 @@ fun MoviePosterScreen(
                         val kodiPort = sharedPreferences.getInt("kodi_port", 8080)
                         val kodiBaseUrl = if (kodiIpAddress.isNotEmpty()) "http://$kodiIpAddress:$kodiPort/image/" else ""
 
-                        val imageUrl = kodiMovie.art?.poster ?: kodiMovie.thumbnail
+                        val imageUrl = kodiMovie.art?.poster ?: kodiMovie.art?.fanart ?: kodiMovie.thumbnail
                         val decodedAndReplacedUrl = imageUrl?.let { url ->
                             try {
                                 val tempUrl = url
@@ -381,8 +360,6 @@ fun MoviePosterScreen(
                         contentScale = ContentScale.Fit
                     )
 
-                    movieViewModel.getMovieDetails(movies[currentMovieIndex].id) // Fetch details for the new movie
-
                     Column(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
@@ -390,9 +367,19 @@ fun MoviePosterScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         // Original movie details display
+                        // Movie tagline
+                        if (showMpaaRating.value) {
+                            currentMovieWithDetails?.tagline?.let { tagline ->
+                                Text(
+                                    text = "$tagline",
+                                    color = Grey,
+                                    modifier = Modifier.padding(vertical = 2.dp)
+                                )
+                            }
+                        }
+
                         // Movie MPAA rating
                         if (showMpaaRating.value) {
-                            //Log.d("MainActivity", "Showing MPAA" + currentMovieWithDetails?.mpaaRating)
                             currentMovieWithDetails?.mpaaRating?.let { mpaaRating ->
                                 Text(
                                     text = "MPAA Rating: $mpaaRating",
@@ -404,9 +391,10 @@ fun MoviePosterScreen(
 
                         // Movie release date
                         if (showReleaseDate.value) {
-                            currentMovieWithDetails?.releaseDate?.let { releaseDate ->
+                            Log.d("MainActivity", "Showing Date" + currentMovieWithDetails?.release_date)
+                            currentMovieWithDetails?.release_date?.let { release_date ->
                                 Text(
-                                    text = "Release Date: $releaseDate",
+                                    text = "Release Date: $release_date",
                                     color = Grey,
                                     modifier = Modifier.padding(vertical = 2.dp)
                                 )
@@ -426,7 +414,7 @@ fun MoviePosterScreen(
                                 }
                                 if (runtimeText.isNotEmpty()) {
                                     Text(
-                                        text = runtimeText,
+                                        text = "Runtime: ${runtimeText}",
                                         color = Grey,
                                         modifier = Modifier.padding(vertical = 2.dp)
                                     )

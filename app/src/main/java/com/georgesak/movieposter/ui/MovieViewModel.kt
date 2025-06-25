@@ -125,34 +125,29 @@ class MovieViewModel(application: Application) : AndroidViewModel(application) {
                             if (playerPropertiesResponse.isSuccessful) {
                                 val playerProperties = playerPropertiesResponse.body()?.result
                                 Log.d(TAG, "Player properties: $playerProperties")
-                                if (playerProperties?.speed == 1) { // Speed 1 means playing
-                                    // 3. Get item details for the active player
-                                    val playerItemRequest = KodiRpcRequest(
-                                        id = 3,
-                                        method = "Player.GetItem",
-                                        params = mapOf(
-                                            "playerid" to videoPlayer.playerid,
-                                            "properties" to listOf("title", "file", "thumbnail", "fanart", "art", "year", "plot", "genre", "director", "cast", "rating", "tagline", "runtime", "streamdetails")
-                                        )
+                                // 3. Get item details for the active player
+                                val playerItemRequest = KodiRpcRequest(
+                                    id = 3,
+                                    method = "Player.GetItem",
+                                    params = mapOf(
+                                        "playerid" to videoPlayer.playerid,
+                                        "properties" to listOf("title", "file", "thumbnail", "fanart", "art", "year", "plot", "genre", "director", "cast", "rating", "tagline", "runtime", "streamdetails")
                                     )
-                                    val playerItemResponse = kodiApiService.getPlayerItem(playerItemRequest)
+                                )
+                                val playerItemResponse = kodiApiService.getPlayerItem(playerItemRequest)
 
-                                    if (playerItemResponse.isSuccessful) {
-                                        val kodiItem = playerItemResponse.body()?.result?.item
-                                        if (kodiItem != null) {
-                                            Log.d(TAG, "Kodi item playing: ${kodiItem.label}")
-                                            _kodiPlayingMovie.value = kodiItem
-                                        } else {
-                                            Log.d(TAG, "No item found for active player. Setting kodiPlayingMovie to null.")
-                                            _kodiPlayingMovie.value = null
-                                        }
+                                if (playerItemResponse.isSuccessful) {
+                                    val kodiItem = playerItemResponse.body()?.result?.item
+                                    if (kodiItem != null) {
+                                        Log.d(TAG, "Kodi item playing: ${kodiItem.label}")
+                                        _kodiPlayingMovie.value = kodiItem
                                     } else {
+                                        Log.d(TAG, "No item found for active player. Setting kodiPlayingMovie to null.")
                                         _kodiPlayingMovie.value = null
-                                        Log.e(TAG, "Error getting player item: ${playerItemResponse.code()} - ${playerItemResponse.errorBody()?.string()}")
                                     }
                                 } else {
-                                    Log.d(TAG, "Movie paused or stopped. Speed: ${playerProperties?.speed}. Setting kodiPlayingMovie to null.")
-                                    _kodiPlayingMovie.value = null // Paused or stopped
+                                    _kodiPlayingMovie.value = null
+                                    Log.e(TAG, "Error getting player item: ${playerItemResponse.code()} - ${playerItemResponse.errorBody()?.string()}")
                                 }
                             } else {
                                 _kodiPlayingMovie.value = null
@@ -227,16 +222,16 @@ class MovieViewModel(application: Application) : AndroidViewModel(application) {
                     val movieDetailsResponse = apiService.getMovieDetails(movieId, apiKey)
                     if (movieDetailsResponse.isSuccessful) {
                         val movieDetail = movieDetailsResponse.body()
-
                         // Fetch release dates for MPAA rating
                         val releaseDatesResponse = apiService.getMovieReleaseDates(movieId, apiKey)
                         if (releaseDatesResponse.isSuccessful) {
                             val usRelease = releaseDatesResponse.body()?.results?.find { it.iso31661 == "US" }
                             val mpaaRating = usRelease?.release_dates?.firstOrNull { it.certification?.isNotEmpty() == true }?.certification
-                            _currentMovieWithDetails.value = movieDetail?.copy(mpaaRating = mpaaRating)
+                            Log.e(TAG, "MPAA: ${mpaaRating}")
+                            _currentMovieWithDetails.value = movieDetail?.copy(mpaaRating = mpaaRating ?: "N/A")
                         } else {
                             Log.e(TAG, "Error fetching movie release dates: ${releaseDatesResponse.code()} - ${releaseDatesResponse.errorBody()?.string()}")
-                            _currentMovieWithDetails.value = movieDetail // Set movie details even if release dates fail
+                            _currentMovieWithDetails.value = movieDetail
                         }
                     } else {
                         Log.e(TAG, "Error fetching movie details: ${movieDetailsResponse.code()} - ${movieDetailsResponse.errorBody()?.string()}")
