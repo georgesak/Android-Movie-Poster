@@ -16,6 +16,7 @@ object Constants {
     const val SHOW_RUNTIME = "show_runtime"
     const val SHOW_RELEASE_DATE = "show_release_date"
     const val SHOW_MPAA_RATING = "show_mpaa_rating"
+    const val SHOW_TAGLINE = "show_tagline"
 
     // Default Values
     const val DEFAULT_KODI_PORT = 8080

@@ -59,7 +59,7 @@ class SettingsActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun SettingsScreen(movieViewModel: MovieViewModel = viewModel()) {
+fun SettingsScreen(movieViewModel: MovieViewModel = viewModel(factory = MovieViewModel.Factory)) {
     val context = LocalContext.current
     val sharedPreferences = context.getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
 
@@ -94,6 +94,9 @@ fun SettingsScreen(movieViewModel: MovieViewModel = viewModel()) {
     val (showMpaaRating, setShowMpaaRating) = remember {
         mutableStateOf(sharedPreferences.getBoolean("show_mpaa_rating", true))
     }
+    val (showTagline, setShowTagline) = remember {
+        mutableStateOf(sharedPreferences.getBoolean("show_tagline", true))
+    }
 
     val (kodiIpAddress, setKodiIpAddress) = remember {
         mutableStateOf(sharedPreferences.getString("kodi_ip_address", "") ?: "")
@@ -123,6 +126,7 @@ fun SettingsScreen(movieViewModel: MovieViewModel = viewModel()) {
         showRuntime: Boolean,
         showReleaseDate: Boolean,
         showMpaaRating: Boolean,
+        showTagline: Boolean,
         kodiIpAddress: String,
         kodiPort: Int,
         kodiPollingInterval: Long,
@@ -140,6 +144,7 @@ fun SettingsScreen(movieViewModel: MovieViewModel = viewModel()) {
             putBoolean("show_runtime", showRuntime)
             putBoolean("show_release_date", showReleaseDate)
             putBoolean("show_mpaa_rating", showMpaaRating)
+            putBoolean("show_tagline", showTagline)
             putString("kodi_ip_address", kodiIpAddress)
             putInt("kodi_port", kodiPort)
             putLong("kodi_polling_interval", kodiPollingInterval)
@@ -186,6 +191,7 @@ fun SettingsScreen(movieViewModel: MovieViewModel = viewModel()) {
                                 showRuntime,
                                 showReleaseDate,
                                 showMpaaRating,
+                                showTagline,
                                 kodiIpAddress,
                                 kodiPort,
                                 kodiPollingInterval,
@@ -394,6 +400,23 @@ fun SettingsScreen(movieViewModel: MovieViewModel = viewModel()) {
                         onCheckedChange = null
                     )
                     Text("Show MPAA Rating")
+                }
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .toggleable(
+                            value = showTagline,
+                            onValueChange = { setShowTagline(it) },
+                            role = Role.Checkbox
+                        )
+                        .padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = showTagline,
+                        onCheckedChange = null
+                    )
+                    Text("Show Tagline")
                 }
             }
 

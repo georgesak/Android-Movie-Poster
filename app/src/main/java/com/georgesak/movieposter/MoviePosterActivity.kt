@@ -136,6 +136,9 @@ fun MoviePosterScreen(
     val showMpaaRating = remember {
         mutableStateOf(sharedPreferences.getBoolean(Constants.SHOW_MPAA_RATING, true))
     }
+    val showTagline = remember {
+        mutableStateOf(sharedPreferences.getBoolean(Constants.SHOW_TAGLINE, true))
+    }
     val trailerKey by movieViewModel.trailerKey.collectAsState()
     var swipeTrigger by remember { mutableStateOf(0) }
     val scope = rememberCoroutineScope()
@@ -263,6 +266,7 @@ fun MoviePosterScreen(
                         showMpaaRating.value,
                         showReleaseDate.value,
                         showRuntime.value,
+                        showTagline.value,
                         modifier = Modifier.align(Alignment.BottomCenter)
                     )
 
@@ -352,6 +356,7 @@ fun MovieDetailsOverlay(
     showMpaaRating: Boolean,
     showReleaseDate: Boolean,
     showRuntime: Boolean,
+    showTagline: Boolean,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -359,7 +364,7 @@ fun MovieDetailsOverlay(
             .padding(bottom = Constants.PADDING_LARGE),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        if (showMpaaRating) {
+        if (showTagline) {
             currentMovieWithDetails?.tagline?.let { tagline ->
                 Text(
                     text = tagline,
